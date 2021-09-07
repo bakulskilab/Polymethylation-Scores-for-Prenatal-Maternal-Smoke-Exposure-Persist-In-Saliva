@@ -1,0 +1,79 @@
+---
+title: "Comparison of Polymethylation score options"
+author: "Freida Blostein"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    code_folding: show
+    highlight: tango
+    number_sections: yes
+    theme: sandstone
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+datadir<-"/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/"
+outputdir<-"/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Output"
+codedir<-"/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Code"
+load(file.path(datadir, 'CreatedData', 'polymethylationscores.RDS'))
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(PerformanceAnalytics)
+```
+
+## Function code
+I created a function based on Jonah's code that takes in as an option the transformation type for the methylation beta matrix, and applies it before creating the polymethylation scores. The code is available at https://github.com/blostein/FFSmoking/blob/main/UsefulCode/makePolyEpiScores.R
+
+
+```{r cache=FALSE, echo=FALSE}
+knitr::read_chunk(file.path(codedir, 'UsefulCode', 'makePolyEpiScores.R'))
+```
+
+```{r makePolyEpiScores.R, eval=FALSE}
+
+```
+
+A few notes on this code: 
+
+1) because the methylation matrix is so large, RStudio kept crashing when I attempted to zscore standardize or center-mean standardize the entire matrix. So, instead, I performed the standardization inside the loop, only upon the CpGs that are used in making each polymethylation scores. Since I think we should be standardizing CpGs, not standardizing individuals, this shouldn't matter. 
+
+2) Currently only 2 standardization options but could add more. 
+
+## Distributions of poly methylation scores with different transformations on beta methylation matrix 
+
+```{r compare PolyMethylation scores distributions}
+lapply(polyscores, function(x){summary(x)})
+lapply(polyscores, function(x){apply(x, 2, sd)})
+lapply(seq_along(polyscores), function(i){polyscores[[i]]%>%pivot_longer(cols=1:4, names_to='Score_Type', values_to='Score')%>%ggplot(aes(x=Score))+geom_histogram()+facet_wrap(~Score_Type)+ggtitle(names(polyscores)[[i]])})
+```
+
+As Kelly thought, the zscore standardized have a larger range and the biggest standard deviations, the standard deviations of the no transform and centered methods are the same, which makes sense as $V(aX+b)=a^2V(X)\implies V(\sum\beta_i*[x_i-\bar{x}])=V(\sum\beta_i*x_i-\beta_i*\bar{x})=V(\sum \beta_i*x_i-k)=V(\sum \beta_i*x_i)$. 
+
+I think it also makes sense the means of the mean centered and zscores standardized scores are 0. 
+
+## Correlation between polymethylation scores of different transforms on the beta methylation matrix
+
+```{r correlation b/t polymethylation scores}
+polyscores_flipped=lapply(seq_along(polyscores), function(i){polyscores[[i]]%>%mutate('method'=names(polyscores)[[i]])%>%pivot_longer(cols=1:4, names_to="Score_type", values_to="Score")})%>%bind_rows()%>%pivot_wider(id_cols=c(MethID, Score_type), names_from='method', values_from='Score')%>%group_by(Score_type)%>%group_split()
+names(polyscores_flipped)=lapply(polyscores_flipped, function(x){x$Score_type%>%unique()})
+
+lapply(seq_along(polyscores_flipped), function(i){chart.Correlation(polyscores_flipped[[i]][3:5]); mtext(names(polyscores_flipped)[[i]], side=3, line=3)})
+```
+
+## Question for Kelly: 
+These polymethylation scores calculated on non-COMBAT corrected methylation beta values -  should they also be calculated using COMBAT (or SVA) -corrected beta values? 
+
+
+## Bivariate analysis of polymethylation scores w/ different transformations & binary prenatal smoking variable
+
+```{r bivariate analysis scores vs preg smoking}
+load(file.path(datadir, 'CreatedData', 'BaseModelData.Rdata'))
+polyscores_flipped<-lapply(polyscores_flipped, function(x) left_join(basemodeldata, x))
+lapply(seq_along(polyscores_flipped), function(i) ggplot(polyscores_flipped[[i]]%>%pivot_longer(cols=notransform:center, names_to='transformType', values_to='polymethylationScore'), aes(x=childteen, y=polymethylationScore, color=smkPreg_binary))+geom_violin()+geom_boxplot(position=position_dodge(width=0.9))+facet_wrap(~transformType)+stat_compare_means(label='p.format')+ggtitle(names(polyscores_flipped)[i]))
+
+```

@@ -1,0 +1,117 @@
+---
+title: "September22_FFReport"
+author: "F blostein"
+date: "9/23/2020"
+output: html_document
+---
+Goals: 
+1. Create linked dataset with variables of interest from full pheno data 
+2. Create table comparing various analytic subsets (methylation data; two-visit methylation data) to full Fragile Families dataset 
+3. Address technical replicates
+
+Questions for Kelly: 
+1. Review plan for principal components of ancestry control 
+2. Check plan for technical replicates 
+3. 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/")
+library(tidyr)
+library(dplyr)
+library(compareGroups)
+library(kableExtra)
+```
+
+
+```{r}
+pheno<-readRDS("/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/OGData/fullpheno.rds")
+#betaqc<-readRDS("/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/OGData/betaqc.rds")
+pdqc<-readRDS("/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/OGData/pdqc.rds")
+```
+
+```{r}
+source("/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Code/Reports/DataDictionary.R")
+```
+
+
+
+```{r, fullpheno}
+#check column names of pheno for restricted health data which appear
+# to begin with suffix ch (i.e. chc10e (tobacco use-ever) and
+#chc10p (tobacco use-during preg)
+colnames(pheno)[grep('ch', colnames(pheno))] 
+#find the id varaibles
+colnames(pheno)[grep('id', colnames(pheno))] 
+#filter for variables of interest 
+
+FF<-pheno %>% select(one_of(idvars), one_of(demovars), one_of(smokingvars), one_of(prenataldrugusevar))
+#Warning message:
+#Unknown columns: `p3a22`, `p3a23`, `p3a23a`, `p3a23b`, `p3a24`, `p4a22`, `p4a23` 
+```
+
+```{r, idgroups}
+#What FF ids have methylation data?
+methy_ids<-pdqc$id
+#technical replicates will be duplicate id + childteen variables from pdqc 
+techrep_ids<-pdqc %>%select(idnum, childteen, MethID)%>%group_by(idnum, childteen)%>%filter(n()>1)%>%pull(MethID)
+#ids with 9visit, 15visit or both visit
+visit9ids<-pdqc%>%filter(childteen=='C')%>%pull(idnum)%>%unique()
+visit15ids<-pdqc%>%filter(childteen=='T')%>%pull(idnum)%>%unique()
+bothvisit_ids<-visit9ids[visit9ids %in% visit15ids]
+visit9only_ids<-visit9ids[!(visit9ids %in%bothvisit_ids)]
+visit15only_ids<-visit15ids[!(visit15ids %in%bothvisit_ids)]
+```
+
+```{r}
+#create flag in FF for having methylation data
+#and flag for having 2 visits of methylation data
+FF<-FF %>% 
+  mutate(MethylData=ifelse(id %in% methy_ids, "Analysis subset", "Not in analysis subset"),
+         TwoVisitData=ifelse(id%in%bothvisit_ids,"Analysis subset - both visits", "Not in both visit analysis subset"))
+table(FF$MethylData)
+table(FF$TwoVisitData)
+```
+
+```{r, checks}
+if((length(visit15only_ids)+length(visit9only_ids)+length(bothvisit_ids)!=length(FF %>% filter(MethylData=="Analysis subset")%>%pull(id)))){print("WARNING ID LENGTHS DO NOT ADD UP")}
+if(length(bothvisit_ids)!=length(FF %>% filter(TwoVisitData=="Analysis subset - both visits")%>%pull(id))){print("WARNING ID LENGTHS DO NOT ADD UP")}
+```
+
+```{r, labelMetaData}
+myBinary<-myBinary[myBinary %in% colnames(FF)]
+myCategorical_O<-myCategorical_O[myCategorical_O %in% colnames(FF)]
+myCategorical_U<-myCategorical_U[myCategorical_U%in%colnames(FF)]
+FF<-FF %>% mutate_at(vars(myBinary, myCategorical_O, myCategorical_U), funs(as.factor(.)))
+```
+
+
+```{r}
+methyl<-createTable(compareGroups(MethylData~.-id-ff_id, data=FF), show.all=T)
+twovisit<-createTable(compareGroups(TwoVisitData~.-id-ff_id, data=FF), show.all=T)
+my_FF<-FF %>% filter(MethylData=="Analysis subset")%>%mutate(smkPreg_binary=ifelse(m1g4%in% c(1, 2, 3), "Yes", ifelse(m1g4%in%c(-3, -2, -9), NA, ifelse(m1g4==4, "No", "FLAG"))))
+xtabs(~m1g4+smkPreg_binary, data=my_FF)
+smk<-createTable(compareGroups(smkPreg_binary~.-id-ff_id, data=my_FF))
+```
+
+```{r}
+export2md(methyl)
+export2md(twovisit)
+export2md(smk)
+```
+
+
+
+```{r}
+#explore technical replicates
+#pdqc %>% filter(MethID %in% techrep_ids) %>% table(~qc_flag_any, data=.)
+techrep_qcF<-pdqc %>% filter(MethID %in% techrep_ids & qc_flag_any==T)
+techrep_qcP<-pdqc %>% filter(MethID %in% techrep_ids & qc_flag_any==F)
+```
+
+
+```{r}
+
+```
+
+
+

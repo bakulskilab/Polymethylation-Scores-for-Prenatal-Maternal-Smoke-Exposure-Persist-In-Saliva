@@ -1,0 +1,897 @@
+---
+title: "Fragile Families Data Cleaning"
+author: "Freida Blostein"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    code_folding: show
+    highlight: tango
+    number_sections: yes
+    theme: sandstone
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/")
+knitr::opts_knit$set(message=FALSE)
+knitr::opts_knit$set(warning=FALSE)
+library(tidyr)
+library(dplyr)
+library(purrr)
+library(tidyselect)
+library(broom)
+library(compareGroups)
+library(kableExtra)
+library(haven)
+library(sjlabelled)
+library(matchmaker)
+library(EpiDISH)
+library("PerformanceAnalytics")
+library(DescTools)
+library(ggplot2)
+library(ggpubr)
+library(GGally)
+library(ggcorrplot)
+library(ggalluvial)
+library(cowplot)
+datadir<-"/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/"
+john_datadir<-"/nfs/turbo/bakulski1/People/johndou/Fragile_Families/ProcessedFiles/jd"
+outputdir<-"/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Output"
+codedir<-"/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Code"
+```
+
+# Lab meeting preface & necessary background
+
+
+**Purpose**: This presentation is a practice for presenting the preliminary results of the third aim of my dissertation to a committee member and important collaborator. I am seeking to get buy-in for splitting the analysis into two papers and begining to write the first paper. 
+
+**Objectives & desired feedback**: 
+My objectives for this lab meeting are: 
+
+1. Practice presenting results 
+2. Test drive presenting through Rmarkdown htmls
+
+And correspondingly, I'm seeking feedback on the logical flow of the presentation and its understandability. 
+
+**Necessary background**:
+
+
+
+#  Objectives and  hypotheses
+
+A) Conduct an ancestry-stratified epigenome wide association study of prenatal maternal smoking and DNA methylation from child saliva samples at age nine and age fifteen. 
+
+B) Examine differences in methylation trajectories from age nine to fifteen of the most significant methylation sites identified in the epigenome-wide association study between those exposed vs unexposed to prenatal smoking. 
+
+C) Develop a saliva epigenetic classifier of prenatal smoke exposure using a machine learning approach and support vector machines and evaluate the agreement of the classifier at two time points. 
+ 
+Hypotheses:
+- I hypothesize that different CpG loci will be associated with maternal prenatal smoking in African ancestry groups than in European and Hispanic ancestry groups. 
+- I hypothesize that the direction of associations between CpGs and prenatal maternal smoking will stay consistent between ages nine and fifteen but that the magnitude of associations will decline over time. 
+- Finally, I hypothesize that classification of prenatal maternal smoking status based upon DNA methylation information from salivary samples will be accurate and consistent at ages nine and fifteen. 
+
+Additional 
+
+# Reading in data and preprocessing: 
+
+## Labeling phenotype data
+```{r, phenotypedataReadinLabel, include=F}
+pheno<-readRDS(paste0(datadir, "OGData/fullpheno.rds"))
+
+#Phenotype labeling & filtering to variables of interest
+#labels
+#to set labels using sjlabelled, needed to fix multibyte characters 
+#https://stackoverflow.com/questions/4993837/r-invalid-multibyte-string
+find_offending_character <- function(x, maxStringLength=256){  
+  print(x)
+  for (c in 1:maxStringLength){
+    offendingChar <- substr(x,c,c)
+    #print(offendingChar) #uncomment if you want the indiv characters printed
+    #the next character is the offending multibyte Character
+  }    
+}
+#lapply(attributes(pheno)$var.labels, find_offending_character)
+attributes(pheno)$var.labels<-gsub("\xad", "'",  attributes(pheno)$var.labels)
+#lapply(attributes(pheno)$var.labels, find_offending_character)
+attributes(pheno)$var.labels<-gsub("\x92", "'",  attributes(pheno)$var.labels)
+#lapply(attributes(pheno)$var.labels, find_offending_character)
+#define vars of interest 
+idvars<-c("id", "ff_id")
+demovars<-c("cm1age", "cm1bsex", "cm1ethrace", "cm1edu", "cm1hhinc", "cm1inpov", "m1h3", "m1h3a", "m1h3b", "m1i4", "m1i4a", "m1i4b", "cf1age", "cf1ethrace", "f1h3", "f1h3a", "f1h3b", "ch5agem","ch6yagem", "c6yagey", "cm5b_age", "cm5b_ageyrs", "cp6yagem", "cp6yagey", "hv5_agem", "hv6_yagem", "hv6_yagey")
+smokingvars<-c("m1g4", "f1g4", "f2j5", "f2j5a", "f2j7", "f2j7a", "f3j31", "f3j32", "f4j18", "f4j19", "f5g17", "f5g18", "k5f1k", "k5f1l", "k6d40", "k6d41", "k6d41", "k6d42", "k6d43", "k6d45", "k6d46", "k6d47", "m2j5", "m2j5a", "m2j7", "m2j7a", "m4j18", "m4j19", "m5g17", "m5g18", "n5f17", "n5f18", "p3a22", "p3a23", "p3a23a", "p3a23b", "p3a24", "p4a22", "p4a23", "p5h15", "p5h15b", "p5q3cr", "p6h74", "p6h75", "p6h76", "p6h77", "p6h78")
+prenataldrugusevar<-c("m1g2", "m1g3", "m1g5", "m1g6")
+
+#filter to these variables
+#FF has data in original form +sjlabelled value labels
+#since these dont' show in compareGroups
+#also will make FF_labeled, where categorical, binary variables
+#will be replaced with their labels
+#FF<-pheno %>% select(one_of(idvars), one_of(demovars), one_of(smokingvars), one_of(prenataldrugusevar))
+varIDX<-which(names(pheno)%in%c(idvars, demovars, smokingvars, prenataldrugusevar))
+FF<-pheno[,varIDX]
+varLabels<-attributes(pheno)$var.labels[varIDX]
+varLabels[59]<-"ID"
+FF<-set_label(FF, c(varLabels))
+#create FF_labeled
+#read in csv with metadata about variables 
+FFmeta<-read.csv("/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/FFMetadata_v07.csv")
+#create long data dictionary  
+FFlong<-FFmeta%>% select(old_name, contains('value'), contains('label')) %>% pivot_longer(cols = contains("value"), names_to="value", values_to="old_values")
+FFlong<-FFlong%>%pivot_longer(cols = contains("label"), names_to="label", values_to="new_labels")
+recodes_long<-FFlong %>% filter(gsub("value", "", value)==gsub("label", "", label)& !is.na(old_values)) %>% select(old_name, old_values, new_labels) 
+#store continuous, binary, categorical etc
+FFmyMeta<-FFmeta %>% filter(old_name %in% c(idvars, demovars, smokingvars, prenataldrugusevar))
+myContinuous<-FFmyMeta %>% filter(type=="Continuous") %>%pull(old_name);
+myContinuous<-colnames(FF)[colnames(FF) %in% myContinuous]
+myBinary<-FFmyMeta%>%filter(type=="Binary")%>%pull(old_name); myBinary<-colnames(FF)[colnames(FF) %in% myBinary]
+myCategorical_O<-FFmyMeta%>%filter(type=="Ordered Categorical")%>%pull(old_name); myCategorical_O<-colnames(FF)[colnames(FF) %in% myCategorical_O]
+myCategorical_U<-FFmyMeta%>%filter(type=="Unordered Categorical")%>%pull(old_name); myCategorical_U<-colnames(FF)[colnames(FF) %in% myCategorical_U]
+#filter to only vars of interest - not continuous variables  
+myRecodes<-recodes_long %>% filter(old_name %in% c(myBinary, myCategorical_O, myCategorical_U))
+#apply matchmaker
+FF_labeled<-match_df(FF, dictionary=myRecodes, from = 'old_values', to='new_labels', by='old_name')
+#reapply correct variable class types and na_codes
+na_codes<-c("-1 Refuse", "-2 Don't know", "-3 Missing", "-9 Not in wave")
+FF_labeled<-FF_labeled %>% mutate_at(vars(any_of(c(myBinary, myCategorical_O, myCategorical_U))), funs(as.factor(ifelse(. %in% na_codes, "Missing", .)))) %>% 
+          mutate_at(vars(any_of(myContinuous)), funs(as.numeric(na_if(na_if(na_if(na_if(., "-3"), '-9'), '-6'), '-2'))))
+#read back in the variable labels 
+FF_labeled<-set_label(FF_labeled, get_label(FF))
+FF_labels<-FF_labeled
+```
+
+
+
+## Cleaning pdqc data 
+### Figure out analytic subsets 1) any methylation data; 2) 2-visits of methylation data
+```{r, pdqcReadin}
+pdqc_all<-readRDS(paste0(datadir, 'OGData/', "pd_qc.rds"))
+pdqc<-pdqc_all %>% filter(probe_fail_10==0 & sex==predicted_sex)
+#What FF ids have methylation data?
+methy_ids<-pdqc$id
+#create slide variable fo pdqc 
+pdqc$slide <- gsub('_.*', '', pdqc$MethID)
+pdqc$array<-gsub('.*_', '', pdqc$MethID)
+#ids with 9visit, 15visit or both visit
+visit9ids<-pdqc%>%filter(childteen=='C')%>%pull(idnum)%>%unique()
+visit15ids<-pdqc%>%filter(childteen=='T')%>%pull(idnum)%>%unique()
+bothvisit_ids<-visit9ids[visit9ids %in% visit15ids]
+visit9only_ids<-visit9ids[!(visit9ids %in%bothvisit_ids)]
+visit15only_ids<-visit15ids[!(visit15ids %in%bothvisit_ids)]
+```
+
+```{r, createAnalyticSubsetFlags}
+#create flag in FF for having methylation data
+#and flag for having 2 visits of methylation data
+FF_labeled<-FF_labeled %>% 
+  mutate(MethylData=ifelse(id %in% methy_ids, "Analysis subset", "Not in analysis subset"),
+         TwoVisitData=ifelse(id%in%bothvisit_ids,"Analysis subset - both visits", "Not in both visit analysis subset"))
+table(FF_labeled$MethylData)
+table(FF_labeled$TwoVisitData)
+```
+
+```{r, checkIDlengths}
+if((length(visit15only_ids)+length(visit9only_ids)+length(bothvisit_ids)!=length(FF_labeled %>% filter(MethylData=="Analysis subset")%>%pull(id)))){print("WARNING ID LENGTHS DO NOT ADD UP")}
+if(length(bothvisit_ids)!=length(FF_labeled %>% filter(TwoVisitData=="Analysis subset - both visits")%>%pull(id))){print("WARNING ID LENGTHS DO NOT ADD UP")}
+```
+
+### Filter technical replicates (only 1 technical replicate per person-visit + decide based on QC variables - pick the one with the lower probe fail percentage)
+
+```{r}
+#technical replicates will be duplicate id + childteen variables from pdqc
+pdqc<-pdqc %>% mutate(newID=paste(idnum, childteen, sep='_'))
+techrep_ids<- pdqc %>% select(newID) %>% group_by(newID)%>%filter(n()>1)
+techreps<-pdqc %>% filter(newID %in% techrep_ids$newID)%>%arrange(idnum,childteen)
+hiPctPF<-techreps %>% group_by(newID) %>%filter(probe_fail_pct==max(probe_fail_pct))%>%pull(MethID)
+pdqc_clean<-pdqc %>% filter(!(MethID %in% hiPctPF) & childteen!='M')
+myMethIDs<-pdqc_clean %>% pull(MethID)
+```
+
+
+## Methylation summary variables
+
+### Cell type proportions
+
+Cell type proportions estimated using [epidDISH](https://www.bioconductor.org/packages/release/bioc/vignettes/EpiDISH/inst/doc/EpiDISH.html#how-to-estimte-cell-type-fractions-using-dnam-data) package and the EpiFibIC reference (generic for epithelial tissues). 
+
+
+```{r read in betaqc & celltype proportions}
+betaqc<-readRDS(file=paste0(datadir, 'OGData/', "noob_filtered.rds"))
+aprioriCG<-c("cg05575921", "cg04180046", "cg05549655", "cg14179389")
+globalmethy<-colMeans(betaqc, na.rm=T)
+globalmethdf<-as.data.frame(cbind("MethID"=names(globalmethy), "globalmethylation"=globalmethy))
+aprioriCGdf<-as.data.frame(t(betaqc[aprioriCG, ]))
+aprioriCGdf$MethID = colnames(betaqc)
+#cell type proportions 
+celltypes<-epidish(beta.m = betaqc, ref.m = centEpiFibIC.m, method = "RPC")
+estF_FF<-as.data.frame(celltypes$estF)
+estF_FF$MethID = row.names(estF_FF)
+```
+
+
+### Clocks
+
+```{r, readInclocks}
+clocks<-read.table(file=paste0(datadir, "OGData/DNAm_clocks_ffcw.txt"), header = T)
+colnames(clocks)[1]<-"MethID"
+```
+
+
+### Global methylation score 
+
+```{r make polymethylaton score}
+#read in cpgs from PMC4833289
+cpgs<-read.csv(paste0(datadir, 'PMC4833289_SuppFile2CpGs.csv'), stringsAsFactors = F, header=F, skip=2)
+#make headers
+header1<-scan(paste0(datadir, 'PMC4833289_SuppFile2CpGs.csv'), nlines=1, what=character(), sep=',')
+header1[7:26]<-c(rep("SSnewborn", 5), rep("SSnewbornCT", 5), rep("SSolder", 5), rep("anynewborn", 5))
+header2<-paste(header1, scan(paste0(datadir, 'PMC4833289_SuppFile2CpGs.csv'), nlines=1, skip=1, what=character(), sep=','), sep='_')
+names(cpgs)<-header2
+#four meta-EWASes: SS_newborn (sustained smoking in newborns); SS_newbornCT (sustained smoking in newborns controlling for cell type) SS_older (sustained smoking in older children); any_newborn (any smoking in newborns)
+#pivot_longer to get single column of coefs and a column for the analysis type
+#and group into a list by analysis type
+cpgs<-cpgs %>% pivot_longer(cols = c(matches("_Coef|_SE|_P|_FDR|_Direction")), names_to = c("set", ".value"), names_pattern="(.+)_(.+)")%>%rename_with(~gsub('_', '', .x))%>%group_split(set)
+cpgs<-cpgs%>%setNames(lapply(cpgs, function(x){x$set %>% unique()}))
+#make scores - no transform, zscore and centermean
+#first, pull script 
+source(file.path(codedir, 'UsefulCode', 'makePolyEpiScores.R'))
+scores=makePolyEpiScore(m=betaqc, b=cpgs)
+scores_z=makePolyEpiScore(m=betaqc, b=cpgs, transformopt = 'zscore')
+scores_center=makePolyEpiScore(m=betaqc, b=cpgs, transformopt = 'meancenter')
+polyscores=list('notransform'=scores, 'zscore'=scores_z, 'center'=scores_center)
+polyscores<-lapply(polyscores, function(x) x%>% mutate(MethID=colnames(betaqc)))
+save(polyscores, file = file.path(datadir, 'CreatedData', 'polymethylationscores.RDS'))
+polyscores_wide<-lapply(seq_along(polyscores), function(i) polyscores[[i]] %>% setNames(c(paste0(colnames(polyscores[[i]])[1:4], '_', names(polyscores)[i]), 'MethID')))%>%reduce(left_join, by='MethID')
+```
+
+```{r make methyl dataframe}
+clocks2<-clocks %>% mutate(idnum=gsub('a', '', idnum))%>%filter(MethID %in% pdqc$MethID) # currently clocks are missing 3 individuals who were in johns pipeline but not jonahs
+
+methyldata<-left_join(left_join(left_join(left_join(left_join(pdqc_clean %>% select(MethID, slide, array,childteen, idnum), globalmethdf), clocks2), estF_FF), aprioriCGdf), polyscores_wide)
+methyldata[, c("globalmethylation", aprioriCG)]<-lapply(methyldata[, c("globalmethylation", aprioriCG)],function(x) as.numeric(as.character(x)))
+#lapply(methyldata, class)
+methyldata_wide <- methyldata %>% select(-MethID)%>% pivot_wider(., names_from=childteen, values_from=any_of(colnames(methyldata)[4:length(colnames(methyldata))]))
+```
+
+```{r individual who is missing global methylation data but had apriori CpG and PMS data?, eval=F}
+#weirdID<-methyldata %>% filter(is.na(globalmethylation))%>%pull(MethID)
+#globalmethy[weirdID] #not actually missing global methylation data
+#clocks %>% filter(MethID%in%weirdID) # #idnum from  not the same as in
+#pdqc_clean %>% filter(MethID==weirdID) #this is just a typo in the idnum from data entry, see format of other #idnums
+#pdqc_clean %>% pull(idnum) %>% head()
+#solution: when creating methyldata, first trim alphabet from clocks$idnum that contain alphabetic characters --> implemented
+#also misssing clocks for 3 sex outlier samples that weren't in jonahs' pipeline: 
+table(is.na(methyldata$horvath13))
+weirdIDs<-methyldata %>% filter(is.na(horvath13))%>%pull(MethID)
+pdqc_all %>% filter(MethID %in% weirdID) %>% xtabs(~predicted_sex_outlier, data=.)
+```
+
+
+## Creation of new variables
+### Binary smoking variable
+```{r}
+FF_labeled<-FF_labeled %>%mutate(smkPreg_binary=ifelse(m1g4%in% c("1 2+pk/d","2 1<pk<2","3 <1pk/d" ), "Yes", ifelse(m1g4%in%c("-2 Don't know", "-3 Missing", "-9 Not in wave"), NA, ifelse(m1g4== "4 None", "No", ifelse(m1g4=="Missing", "Missing", "FLAG")))))
+#xtabs(~m1g4+smkPreg_binary, data=FF_labeled)
+```
+
+### Ancestry variables
+
+Ancestry is based on csv files of ancestry-specific PCS created by Erin (per Jonah meeting Oct 6 2020). If an ID was in {african/european/hispanic}, then the individual is labeled as such. 
+```{r}
+# read in PCs
+euroPC<-read.csv("/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/OGData/pcs/european.csv")
+afrPC<-read.csv("/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/OGData/pcs/african.csv")
+hisPC<-read.csv("/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/OGData/pcs/hispanic.csv")
+allPC<-read.table("/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/OGData/pcs/global_pcs.txt", col.names=c("X", "idnum", paste("PC", 1:20, sep='')))
+#individuals in each ancestry specific pc group can be labeled as that ancestry for categorical ancestry variable 
+FF_labeled<-FF_labeled %>% mutate(ancestry=case_when(MethylData=="Analysis subset" & id %in% hisPC$idnum~"Hispanic ancestry", MethylData=="Analysis subset" & id %in%afrPC$idnum~"African ancestry", MethylData=="Analysis subset" & id %in% euroPC$idnum~"European ancestry", MethylData=="Analysis subset" & !(id %in%c(hisPC$idnum, afrPC$idnum, euroPC$idnum)) & (id %in% allPC$idnum)~"Other ancestry", MethylData=="Analysis subset" & !(id %in%c(hisPC$idnum, afrPC$idnum, euroPC$idnum)) & !(id %in% allPC$idnum)~"Missing PC data", MethylData!="Analysis subset"~"Not in analysis subset"))
+#check ancestry variable
+#table(FF_labeled$ancestry)
+#with(FF_labeled, xtabs(~ancestry+cm1ethrace))
+MissingPCdata<-FF_labeled %>% filter(ancestry=="Missing PC data")%>%select(id)
+save(MissingPCdata, file = "/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/CreatedData/MissingPC.Rdata")
+#add PC data to FF_labeled 
+FF_labeled<-left_join(FF_labeled, allPC %>% mutate(id=as.character(idnum)) %>% select(id, PC1, PC2)%>%rename_at(vars(-id), function(x) paste0('global_', x, sep='')))
+localPC<-rbind(euroPC, afrPC, hisPC)
+FF_labeled<-left_join(FF_labeled, localPC  %>% mutate(id=as.character(idnum)) %>% select(id, PC1, PC2)%>% rename_at(vars(-id), function(x) paste0('local_', x, sep='')))
+```
+
+There were `r length(MissingPCdata$id)` individuals without PC data. None of these individuals had data in the global PC file, so I assume they are actually missing genetic data (for whatever reason, possibly QC).
+
+### Prenatal exposure variables 
+Recoded frequency of prenatal alcohol drinking and drug use into Yes/no binary variables for drinking and drug use during pregnancy. 
+```{r PrenatalExposure}
+#table(FF_labeled$m1g2) # during preg, alchohol freq
+#table(FF_labeled$m1g3) # during preg, drugs freq 
+with(FF_labeled, table(m1g2, m1g3))
+FF_labeled<-FF_labeled %>% mutate_at(c("m1g2", "m1g3"), .funs=funs(YesNoPreg=ifelse(.=="5 Never", "No", ifelse(. =="Missing", "Missing", "Yes"))))
+with(FF_labeled, table(m1g2, m1g2_YesNoPreg))
+with(FF_labeled, table(m1g3, m1g3_YesNoPreg))
+#table(FF_labeled$m1g5) # in last year, alc/drugs interfered with work/relationships
+#table(FF_labeled$m1g6) # ever sought help for drug/alc problems
+```
+## Postnatal smoke exposure 
+Maternal postnatal smoking at different survey points is fairly correlated, and alluvial plots of changes over time show broad consistency, so I decided to create a single smoking variable for maternal smoking at age 1 and age 5 - if mothers were smoking at either age 1 or age 5 then "Maternal smoking at age 1 or 5", if not smoking at age 1 and age 5 then "No maternal smoking at age 1 and age 5" and then if missing data at one age and no at the other, then "Missing" (and if missing at both ages, "Missing"). Also created a similar dose variable capturing maternal packs per day that could be used instead. Decided to use just age 1 and age 5 because at these two time points the mother was asked (as opposed to PCG, also the dataset of Fragile Families metadata is missing PCG questions from age 3 about smoking) and they both preceed the actual saliva collection for both saliva collection age points. Then use a smoking dose variable from the mother or PCG interview at wave of saliva collection as an additional second hand smoke exposure variable. 
+
+```{r PostnatalSmoke}
+#Baseline (1) -> Year 1/Age 1 (2) ->Year 3/Age3 (3) -> Year 5 (4) ->Year 9 (5) -> year 15 (6)
+#Do you smoke in past month (how many packs per day)
+#Mom            ->m2j5 (m2j5a)    ->                  -> m4j18 (m4j19) /p4 -> m5g17 (m5g18) / n5f17 (n5f18) 
+#PCG                              p3a23a(p3a23b)                              n5f17 (n5f18)-> p6h76 (p6h77)
+#seem to be missing p3 variables (PCG survey year 3) 
+#number of people in household who smoke 
+#p3a23->p5h15b->p6h78
+
+#hours child around smoke 
+#p3a21 -> p4a24->p5h15c
+
+#with(FF_labeled, table(m2j5, m4j18))
+#with(FF_labeled, table(m4j18, m5g17))
+#with(FF_labeled, table(n5f17, m5g17))
+#with(FF_labeled, table(p6h76, m5g17))
+
+
+plot_grid(FF_labeled %>% select(m2j5, m4j18, m5g17, n5f17, p6h74) %>% mutate_all(funs(as.numeric(.))) %>%ggcorr(label=T)+ggtitle("Correlation between Yes/No smoking (mother) \n at years 1, 5, & 9 & PCG at years 9 & 15")
+,FF_labeled %>% select(m2j5a, m4j19, m5g18, n5f18, p6h77) %>% mutate_all(funs(as.numeric(.))) %>%ggcorr(label=T)+ggtitle("Correlation between packs per day smoking (mother) \n at years 1, 5, 9 & PCG at years 9 and 15"), nrow=2)
+
+yesnosmkalluv<-to_lodes_form(as.data.frame(FF_labeled %>% select(m2j5, m4j18, m5g17, p6h74) %>% mutate(m5g17=stringr::str_to_title(m5g17))%>% group_by(m2j5, m4j18, m5g17, p6h74) %>% count()), axes=1:4, id='Cohort')
+
+#ggplot(yesnosmkalluv, aes(x=x, stratum = stratum, alluvium=Cohort, fill=stratum, label=stratum, y=n))+geom_flow(stat="alluvium", lode.guidance="backfront", color='darkgrey')+geom_stratum()+scale_x_discrete(labels=c("Age 1", "Age 5", "Age 9"))
+
+smkdose<-to_lodes_form(as.data.frame(FF_labeled %>% select(m2j5a, m4j19, m5g18, p6h77)%>% mutate_at(vars(c("m2j5a", "m4j19", "m5g18")), funs(factor(substring(., 1, 1), labels=levels(FF_labeled$m2j5a)))) %>% group_by(m2j5a, m4j19, m5g18, p6h77) %>% count()), axes=1:4, id='Cohort')
+#ggplot(smkdose, aes(x=x, stratum = stratum, alluvium=Cohort, fill=stratum, label=stratum, y=n))+geom_flow()+geom_stratum()+scale_x_discrete(labels=c("Age 1", "Age 5", "Age 9"))
+
+plot_grid(ggplot(yesnosmkalluv, aes(x=x, stratum = stratum, alluvium=Cohort, fill=stratum, label=stratum, y=n))+geom_flow()+geom_stratum()+scale_x_discrete(labels=c("Age 1", "Age 5", "Age 9", "Age 15"))
++ggtitle("Alluvial plot of Yes/No smoking variables from age 1 to age 9 (mother) and age 15 (PCG)"), ggplot(smkdose %>% filter(!(stratum %in% c("-6 Skip", "Missing"))), aes(x=x, stratum = stratum, alluvium=Cohort, fill=stratum, label=stratum, y=n))+geom_flow()+geom_stratum()+scale_x_discrete(labels=c("Age 1", "Age 5", "Age 9", "Age 15"))+ggtitle("Alluvial plot of smoking per day among those smoking from age 1 to age 9 (mother) and 15 (PCG)"), nrow=2)
+
+#ggplot(FF_labeled, aes(x=p5h15b, y=p6h78))+geom_jitter()+stat_cor()+scale_x_continuous('# smoking in house age 9')+scale_y_continuous('# smoking in house age 15')+ggtitle("# individuals smoking in house correlation age 9 and age 15")
+
+#Make any maternal postnatal smoking variable & dose categorization for maternal smoking at ages 1 & 5 
+FF_labeled<-FF_labeled %>% mutate(PostnatalMaternalSmokingAny = case_when(
+                                m2j5 =="1 Yes" ~ "Maternal smoking at age 1 or age 5",
+                                m4j18=="1 Yes" ~ "Maternal smoking at age 1 or age 5",
+                                m2j5 == "Missing" & m4j18=="Missing" ~ "Missing",
+                                m2j5 == "Missing" & m4j18=="2 No" ~ "Missing",
+                                m2j5 == "2 No" & m4j18=="Missing" ~ "Missing",
+                                m2j5 == "2 No" & m4j18=="2 No" ~ "No maternal smoking at age 1 and age 5")) %>%
+  mutate(PostnatalMaternalSmokingDose=case_when(
+                                m2j5a %in% c("2 1pk/d", "3 1.5pk/d", "4 2pk/d", "5 >2pk/d") &
+                                m4j19 %in% c("2 About pack/day", "3 Pack and half/day", "4 2 packs/day", "5   
+                                          More 2 packs/day") ~ "Mom - pack/d or greater at both age 1 & 5", 
+                                m2j5a %in% c("2 1pk/d", "3 1.5pk/d", "4 2pk/d", "5 >2pk/d") &
+                                !(m4j19 %in% c("2 About pack/day", "3 Pack and half/day", "4 2 packs/day", "5 
+                                          More 2 packs/day")) ~ "Mom - pack/d or greater at either age 1 or 5",
+                                !(m2j5a %in% c("2 1pk/d", "3 1.5pk/d", "4 2pk/d", "5 >2pk/d")) &
+                                m4j19 %in% c("2 About pack/day", "3 Pack and half/day", "4 2 packs/day", "5 
+                                          More 2 packs/day") ~ "Mom - pack/d or greater at either age 1 or 5",
+                                m2j5a %in% c("1 <1/2 pk/d") | m4j19 %in% c("1 Less half pack/day")~"Mom - less than half pack/d at either age 1 or 5", 
+                                m2j5a %in% c("-6 Skip") & m4j19 %in% c("-6 Skip")~
+                                  "No maternal smoking at age 1 or 5", 
+                                m2j5a %in% c("Missing") & m4j19 %in% c("-6 Skip", "Missing")~"Missing", 
+                                m2j5a %in% c("Missing", "-6 Skip") & m4j19 %in% c("Missing")~"Missing"))
+
+with(FF_labeled, table(PostnatalMaternalSmokingAny, m2j5, m4j18))
+#with(FF_labeled, table(m2j5a, m4j19, PostnatalMaternalSmokingDose))
+#with(FF_labeled, table(PostnatalMaternalSmokingAny, PostnatalMaternalSmokingDose))
+```
+
+
+Maybe here best to have 1 variable capturing any maternal postnatal smoking at age 1 & 5 and then use in each crossectional model the dose of maternal postnatal smoking at current visit (and similarly for linear mixed effect model)?
+
+```{r makeMyFF}
+varLabels2<-c(paste(colnames(FF_labeled)[1:66], varLabels), "Has any methylation data?", "Has two visits of methylation data", "Any maternal smoking during pregnancy", "Ancestry from PCA of child's genetic data", "PC 1 (global)", "PC 2 (global", "PC 1 (within ancestry category)", "PC 2 (within ancestry category",
+"Any alcohol during pregnancy", "Any drugs during pregnancy", "Any postnatal smoking (age 1 & 5)", "Postnatal smoking dose at age 1 & 5")
+FF_labeled<-set_label(FF_labeled, varLabels2)
+  
+myFF<-FF_labeled %>% filter(MethylData=="Analysis subset")%>%mutate(idnum=id)
+myFF<-left_join(myFF, methyldata)
+varLabels3<-c(varLabels2, "ID", "Methylation ID", "Slide", "Array (RC)", "Visit", "Global methylation", "horvath13 methylation clock", "horvath18 methylation clock", "pediatric methylation clock", "levine methylation clock", "Epithelial cell proportion", "Fibroid cell proportion", "Immune cell proportion", "cg05575291 methylation", "cg04180046 methylation",  "cg05549655 methylation", "cg14179389 methylation", "PES: Any smoking, newborn cordblood", "PES: Sustained smoking, newborn cordblood", "PES: Sustained smoking, newborn cordblood (+CT control)", "PES: Sustained smoking, older children peripheral blood", "PES: Any smoking, newborn cordblood - zscore", "PES: Sustained smoking, newborn cordblood - zscore", "PES: Sustained smoking, newborn cordblood (+CT control) - zscore", "PES: Sustained smoking, older children peripheral blood - zscore", "PES: Any smoking, newborn cordblood - mean center", "PES: Sustained smoking, newborn cordblood - mean center", "PES: Sustained smoking, newborn cordblood (+CT control) - mean center", "PES: Sustained smoking, older children peripheral blood - mean center")
+myFF<-set_label(myFF, varLabels3)
+```
+### Child smoking
+Exclude children who reported smoking at age 9 and age 15. Interestingly, the children who report smoking at age 9 do not report smoking at age 15, and the parental perception of child smoking at age 9 does not match the children who say they have ever smoked a cigarrette. For now using the 'ever smoked' variable from age 15 for the exclusion, but there is also a 'smoked in past month' that we could use instead (lose fewer children). 
+
+```{r, ChildSmoke}
+with(myFF, table(k5f1l,childteen)) # 6 kids smoking at age 9 
+with(myFF, table(p5q3cr, k5f1l)) # not the same kids whose parents say somewhat or very true that the child is using tobacco
+with(myFF, table(k6d40, childteen)) # 41 kids say ever smoked a cigarette at age 15
+#with(myFF, summary(k6d41))
+with(myFF, table(k6d42, childteen)) # of these only 13 say they've smoked in the past month 
+#with(myFF, summary(k6d43))
+with(myFF, table(k5f1l, k6d40, childteen))# not the same kids at age 9 and 15
+```
+
+### Maternal or PCG smoking dose at time of sample 
+
+```{r visitMaternalSmoke}
+myFF<-myFF %>% mutate(SmkAtVisitPastmonth=case_when(childteen=='C' & m5g17=='1 yes' & m5g18 %in% c("2 about a pack", "3 a pack and a half", "4 about 2 packs", 
+                              "5 more than two  packs") ~ "Pack or more a day", 
+                              childteen=='C' & m5g17=='1 yes' & m5g18=="1 less than half a pack a day" ~ "Less than pack a day", 
+                              childteen=='C' & n5f17=="1 yes" & n5f18 =='2 about a pack' ~ "Pack or more a day",
+                              childteen=='C' & n5f17=="1 yes" & n5f18 =="1 less than half a pack day" ~ "Less than pack a day",
+                              childteen=='C' & m5g17=="1 yes" & m5g18 %in% c("-6 Skip", "Missing")~"Missing",
+                              childteen == 'C' & n5f17%in%c("-7 N/A", "2 no") & m5g17=="2 no" ~ "No smoking", 
+                              childteen == 'C' & n5f17%in%c("2 no") & m5g17%in%c("2 no", "Missing") ~ "No smoking", 
+                              childteen == 'C' & n5f17 %in% c("Missing", "-7 N/A") & m5g17 =="Missing" ~ "Missing", 
+                              childteen=='T' & p6h76 %in% c("-6 Skip", "0 None") ~ "No smoking", 
+                              childteen=='T' & p6h77%in% c("1 5 or fewer cigarettes per day", "2 About half a pack a day, 10 cigarettes")~"Less than pack a day", 
+                              childteen=='T' & p6h77 %in% c("3 About a pack a day, 20 cigarettes", "4 More than 1 pack a day")~"Pack or more a day",
+                              childteen=='T' & p6h77 == "Missing"~"Missing"))%>%
+              mutate(SmkAtVisitYesNo=case_when(SmkAtVisitPastmonth=="No smoking"~"No", 
+                                               SmkAtVisitPastmonth %in% c("Less than pack a day", "Pack or more a day") ~ "Yes", 
+                                               childteen=='T'& SmkAtVisitPastmonth=="Missing" & !(p6h76 %in% c("-6 Skip", "0 None", "Missing"))~"Yes",
+                                               childteen=='C' & SmkAtVisitPastmonth=="Missing" & m5g17=='1 yes'~"Yes", 
+                                               childteen=='C' & SmkAtVisitPastmonth=="Missing" & m5g17!='1 yes'~"Missing", 
+                                               childteen=='T'& SmkAtVisitPastmonth=="Missing" & p6h76 %in% c("-6 Skip", "0 None", "Missing")~"Missing"))
+
+myFF %>% filter(childteen=='C') %>% xtabs(~SmkAtVisitPastmonth+SmkAtVisitYesNo, data=.)
+myFF %>% filter(childteen=='T') %>% xtabs(~SmkAtVisitPastmonth+SmkAtVisitYesNo, data=.)
+myFF$SmkAtVisitPastmonth<-factor(myFF$SmkAtVisitPastmonth)
+```
+### Child's age at time of interview/visit
+```{r}
+myFF %>% filter(is.na(cp6yagem) &is.na(hv6_yagem) & childteen=='T')%>%dim() #3
+myFF %>% filter(is.na(cm5b_age) &is.na(hv5_agem) &childteen=='C')%>%dim() #1 
+myFF %>% filter(!is.na(cm5b_age) & is.na(hv5_agem) & childteen=='C')%>%dim()#1
+myFF %>% filter(!is.na(cp6yagem) &is.na(hv6_yagem))%>%dim() #990
+
+myFF <- myFF %>% 
+  mutate(ChildAgeAtIn=case_when(childteen=='C'~ cm5b_age, childteen=='T'~cp6yagem))%>%
+  mutate(ChildAgeAtVisit=case_when(childteen=='C'~hv5_agem, childteen=='T'~hv6_yagem))%>% 
+  mutate(ChildAgeComposite=case_when(childteen=='C' & !is.na(hv5_agem)~hv5_agem, 
+         childteen=='C' & is.na(hv5_agem)~cm5b_age, 
+         childteen=='T' & !is.na(hv6_yagem)~hv6_yagem, 
+         childteen=='T' & is.na(hv6_yagem)~cp6yagem))
+
+myFF %>% filter(childteen=='C')%>%group_by(ChildAgeAtVisit, ChildAgeComposite)%>%summarise(n=n())%>%filter(ChildAgeAtVisit!=ChildAgeComposite)
+
+myFF %>% filter(childteen=='T')%>%group_by(ChildAgeAtVisit, ChildAgeComposite)%>%summarise(n=n())%>%filter(ChildAgeAtVisit!=ChildAgeComposite)
+
+ggplot(myFF%>%filter(childteen=='C'), aes(cm5b_age, hv5_agem))+geom_point()+stat_cor()+ggtitle("Correlation between childs age at mom interview (9 yr) and childs age at home visit (9 yr)")
+age5resid<-myFF %>% filter(childteen=='C')%>%mutate(age5_resid=cm5b_age-hv5_agem)%>%pull(age5_resid)
+hist(age5resid)
+
+age6resid<-myFF %>% filter(childteen=='T')%>%mutate(age6_resid=cp6yagem-hv6_yagem)%>%pull(age6_resid)
+ggplot(myFF%>%filter(childteen=='T'), aes(cp6yagem,hv6_yagem))+geom_point()+stat_cor()+ggtitle("Correlation between childs age at mom interview (15 yr) and childs age at home visit (15 yr)")
+hist(age6resid)
+
+table(FF_labeled$cp6yagem-FF_labeled$hv6_yagem)
+table(FF_labeled$cm5b_age-FF_labeled$hv5_agem)
+table(is.na(myFF$ChildAgeComposite)) # 4
+
+varLabels4<-c(varLabels3, "Mother/PCG (9/15 yr) smoking in month prior to interview (pk/day)", "Mother/PCG (9/15 yr) smoking in month prior to interview (yes/no)", "Child's age at maternal/PCG (9/15 yr) interview (months)", "Child's age at home vist (9/15 years) (months)", "Constructed child's age at home visit (in months) (9/15 years)")
+myFF<-set_label(myFF, varLabels4)
+```
+I also found two variables for child's age at home visit, but the variable for child's age at home visit for 15 years has a large amount of missingness in it (missing n=`r myFF %>% filter(is.na(hv6_yagem) & childteen=='T')%>%nrow()`). The variable for child's age at home visit for 9 year visit is better (missing n=`r myFF %>% filter(is.na(hv5_agem) & childteen=='T')%>%nrow()`). The interview age variables correlate well with the home visit age variables. For the 9 year interview/home visit ages, there are 5 individuals with >12 month difference between the ages, for the 15 year visit, there are 0 (and actually, there is 0 difference for any of the individuals with nonmissing home visit ages). So one option would be to use the home visit ages for the 9 year visit and for individuals with home visit age data available for the 15 year visit, supplementing the 15 year visit age variable with  the 15 year PCG interview age visit for those missing the home visit age. Alternatively we could use baby birthdate and saliva colleciton date to create an age variable. I have the baby DOB variable, but I don't have/don't know where a saliva sample collection date would be.  
+
+# Analysis 
+
+## Randomization of prenatal maternal smoking across slide numbers
+
+```{r slide number vs prenatal maternal smoking}
+slide_count<-myFF %>% mutate(slide=as.factor(slide))%>% group_by(smkPreg_binary, slide, .drop=F)%>%count()%>%pivot_wider(id_cols = slide, names_from=smkPreg_binary, values_from=n)%>%arrange(Yes)%>%mutate(Proportion=Yes/(No+Yes))
+hist_data<-slide_count %>% ggplot(aes(x=Proportion))+geom_histogram(binwidth = 0.1, fill='blue', alpha=0.5, breaks=seq(0, 1, 0.1))+ggtitle('Histogram proprotion smk (from data)')
+hist_data_c<-slide_count %>% ggplot(aes(x=Yes))+geom_histogram( fill='blue', alpha=0.5, breaks=c(0:12))+scale_x_continuous(breaks=c(0:12))+ggtitle('Histogram # Yes smk (from data)')
+
+kable(slide_count)%>%kable_styling()%>%scroll_box(width='100%', height='400px')
+
+#simulation
+set.seed(seed=20210216)
+n<-nrow(myFF)
+yes<-table(myFF$smkPreg_binary)[2]; no<-table(myFF$smkPreg_binary)[1]
+values<-data.frame('smk'=sample(c('No', 'Yes'), n, replace=T, prob=c(no/(no+yes), yes/(no+yes))))
+values_slides<-values %>% 
+    group_by((row_number()-1) %/% (n()/152)) %>%
+    nest()%>%unnest(cols=c(data))
+colnames(values_slides)<-c('slide', 'smk')
+slide_sim<-values_slides%>%mutate(slide=as.factor(slide)) %>% group_by(smk, slide, .drop=F)%>%count()%>%pivot_wider(id_cols = slide, names_from=smk, values_from=n)%>%arrange(Yes)%>%mutate(Proportion=Yes/(No+Yes))
+hist_sim<-slide_sim%>% ggplot(aes(x=Proportion))+geom_histogram(binwidth = 0.1, fill='red', alpha=0.5, breaks=seq(0, 1, 0.1))+ggtitle('Histogram proprotion smk (from simulation)')
+hist_sim_c<-slide_sim%>% ggplot(aes(x=Yes))+geom_histogram(fill='red', alpha=0.5, breaks=c(0:12))+scale_x_continuous(breaks=c(0:12))+ggtitle('Histogram # Yes smk (from simulation)')
+
+
+hist_overlay<-slide_count %>% ggplot(aes(x=Proportion))+geom_histogram(fill='blue', binwidth = 0.1, alpha=0.5, breaks=seq(0, 1, 0.1))+geom_histogram(aes(x=slide_sim$Proportion), breaks=seq(0, 1, 0.1), fill='red', binwidth = 0.1, alpha=0.5)+xlim(0,1)
+hist_overlay_c<-slide_count %>% ggplot(aes(x=Yes))+geom_histogram(fill='blue', alpha=0.5, breaks=c(0:12))+geom_histogram(aes(x=slide_sim$Yes), fill='red',  alpha=0.5, breaks=c(0:12))+scale_x_continuous(breaks=c(0:12))
+
+
+
+plot_grid(plot_grid(hist_data, hist_sim, nrow=2), hist_overlay, nrow=1)
+plot_grid(plot_grid(hist_data_c, hist_sim_c, nrow=2), hist_overlay_c, nrow=1)
+
+
+```
+
+## Comparison of analytic sample - methylation data to Fragile Families sample 
+
+```{r, warning=F, message=F}
+FF_labeled<-set_label(FF_labeled, varLabels)
+methyl<-createTable(compareGroups(MethylData~smkPreg_binary+cm1inpov+cm1ethrace+cm1bsex+m1g2_YesNoPreg+m1g3_YesNoPreg+PostnatalMaternalSmokingAny+k5f1l+k6d40+f1g4, data=FF_labeled), show.all=T)
+export2md(methyl, caption="Exclusion table of all Fragile Families vs those with any methylation data for main predictors and key demographic variables from first wave")
+```
+
+
+## Comparison of variables by ancestry 
+```{r, warning=F, message=F, include=F}
+myFF<-set_label(myFF, varLabels4)
+ancestrytable<-strataTable(createTable(compareGroups(ancestry~globalmethylation+cg05575921+pediatric+levine+Epi+Fib+IC+smkPreg_binary+cm1inpov+cm1ethrace+cm1bsex+m1g2_YesNoPreg+m1g3_YesNoPreg+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth+k6d40+k6d42+f1g4, data=myFF), show.all=F), 'childteen')
+export2md(ancestrytable)
+```
+
+## Flow chart of sample exclusions
+
+
+```{r MakeFlowChart}
+methylCohort<-pdqc_all %>% filter(childteen!='M')
+
+basemodelvar<-c("smkPreg_binary", "ancestry", "cm1bsex", "cm1inpov", "Epi", "IC", "ChildAgeComposite")
+basemodeldata<-myFF %>% filter_at(all_of(basemodelvar), all_vars(!(. %in%c("Missing", "Missing PC data"))& !is.na(.)))
+child_base<-basemodeldata%>%filter(childteen=='C')
+teen_base<-basemodeldata%>%filter(childteen=='T')
+
+prenatalexposurevar<-c(basemodelvar, "m1g2_YesNoPreg", "m1g3_YesNoPreg")
+prenatalexdata<-basemodeldata %>%filter_at(all_of(prenatalexposurevar), all_vars(!(. %in% c("Missing"))))
+child_prenatal<-prenatalexdata%>%filter(childteen=='C')
+teen_prenatal<-prenatalexdata%>%filter(childteen=='T')
+
+secondhandsmokevars<-c(prenatalexposurevar, "PostnatalMaternalSmokingAny", "SmkAtVisitPastmonth")
+secondhandsmkdata<-prenatalexdata%>%filter_at(all_of(secondhandsmokevars), all_vars(!(. %in% c("Missing"))))
+child_secondhand<-secondhandsmkdata %>% filter(childteen=='C')
+teen_secondhand<-secondhandsmkdata%>%filter(childteen=='T')
+twovisit_secondhand<-secondhandsmkdata %>% filter(idnum %in% child_secondhand$idnum & idnum %in% teen_secondhand$idnum)
+
+child_smoke<-secondhandsmkdata %>% filter(k5f1l!= "2 no" & childteen=='C')
+child_nosmoke<-secondhandsmkdata %>% filter(k5f1l=="2 no" & childteen=='C')
+teen_smoke<-secondhandsmkdata %>% filter(k6d40!="2 No" & childteen=='T')
+teen_nosmoke<-secondhandsmkdata %>% filter(k6d40=="2 No" & childteen=='T')  
+twovisit_nosmoke<-secondhandsmkdata %>% filter(idnum %in% child_nosmoke$idnum & idnum %in% teen_nosmoke$idnum)
+
+fathersmkdata<-secondhandsmkdata %>% filter(f1g4!="Missing")
+
+#Make Labels
+n_fullFF<-paste0("Fragile Families cohort \n", "n=", FF_labeled %>% nrow())
+n_methylQC<-paste0("Cohort with 450K methylation data \n", "n=", methylCohort$idnum%>%unique()%>%length(), "individuals with m=", methylCohort$MethID%>%length(), "samples")
+
+n_QCloss<-paste0("Methylation data QC: 12 low-intensity samples dropped, \n", pdqc_all%>%filter(probe_fail_10==T)%>%nrow()-12, " samples with >10% of probes failing dropped, \n", pdqc_all%>%filter(sex!=predicted_sex & probe_fail_10==F & childteen!='M')%>%nrow(), " discordant sex samples dropped, \n & ", nrow(pdqc)-nrow(pdqc_clean), " duplicate samples dropped")
+n_methylFF<-paste0("Cohort with quality controlled 450K data \n","n=", myFF %>% select(id) %>% unique() %>% nrow(), " individuals with m=", myFF%>%nrow(), " samples")
+
+n_basemodel<-paste0("Base models: \n", "n=", basemodeldata %>% select(id) %>% unique() %>% nrow(), " individuals with m=", basemodeldata %>%nrow(), " samples")
+n_baseexclusions<-paste0("n=",  myFF %>% filter_at(all_of(basemodelvar), any_vars((. %in%c("Missing", "Missing PC data"))))%>% select(id) %>% unique() %>% nrow(), " individuals & m=", myFF %>% filter_at(all_of(basemodelvar), any_vars((. %in%c("Missing", "Missing PC data")))) %>% nrow(), " samples missing principal components of ancestry; \n n=", myFF %>% filter_at(all_of(basemodelvar), any_vars((is.na(.))))%>%select(id)%>%unique()%>%nrow(), " individuals & m=", myFF %>% filter_at(all_of(basemodelvar), any_vars((is.na(.))))%>%nrow(), " samples missing child age at maternal/PCG interview")
+
+n_prenatalexposures<-paste0("Prenatal exposures models: \n","n=", prenatalexdata %>% select(id) %>% unique() %>% nrow(), " individuals with m=", prenatalexdata %>%nrow(), " samples")
+n_prenatalexclusions<-paste0("n=", basemodeldata %>% filter_at(all_of(prenatalexposurevar), any_vars(. %in% c("Missing"))) %>% select(id) %>% unique() %>% nrow(), " individuals & m=", basemodeldata %>% filter_at(all_of(prenatalexposurevar), any_vars(. %in% c("Missing"))) %>% nrow(), " samples missing \n data on maternal prenatal alcohol and drug use")
+
+n_secondhandSmk<-paste0("Secondhand smoke exposure models: \n","n=", secondhandsmkdata %>% select(id) %>% unique() %>% nrow(), " individuals with m=", secondhandsmkdata %>%nrow(), " samples")
+n_secondhandexclusions<-paste0("n=", prenatalexdata$id[!(prenatalexdata$id %in% secondhandsmkdata$id)] %>% unique()%>% length(), " individuals & m=", prenatalexdata %>% filter_at(all_of(secondhandsmokevars), any_vars(. %in% c("Missing"))) %>% nrow(), " samples missing data \n on maternal or primary care giver postnatal smoking")
+
+n_Child<-paste0('n=', child_secondhand  %>% nrow(), " individuals with a 9 year visit")
+n_ChildSmkexcluded<-paste0("Sensitivity analysis exclude children who smoke: \n",'n=', child_nosmoke %>% nrow(), " individuals with a 9 year visit")
+n_ChildSmkexclusions<-paste0('n=', child_smoke%>%nrow(), " individual \n smoking at 9 year visit \n or missing focal child smoking data")
+n_Teen<-paste0('n=', teen_secondhand  %>% nrow(), " individuals with a 15 year visit")
+n_TeenSmkexcluded<-paste0("Sensitivity analysis exclude children who smoke: \n",'n=', teen_nosmoke %>% nrow(), " individuals with a 15 year visit")
+n_TeenSmkexclusions<-paste0('n=', teen_smoke%>%nrow(), " individuals \n smoking at 15 year visit \n or missing focal child smoking data") 
+
+n_sensFatherSmoking<-paste0("Sensitivity analysis: compare effects of maternal and paternal prenatal smoking \n", "n=", fathersmkdata %>% select(id) %>% unique() %>% nrow(), " individuals with m=", fathersmkdata %>%nrow(), " samples", "\n with prenatal paternal smoking data")
+n_sensFatherSmokingEx<- paste0("n=", secondhandsmkdata$id[!(secondhandsmkdata$id %in% fathersmkdata$id)] %>% unique()%>% length(), " individuals & m=", secondhandsmkdata %>% filter(f1g4 %in% c("Missing")) %>% nrow(), " samples missing data on paternal prenatal smoking")
+
+n_twovisits<-paste0("n=", twovisit_secondhand%>%pull(idnum) %>%unique() %>%length(), " individuals with both a 9 and 15 year visit")
+n_twovisitsSmkExcluded<-paste0("Sensitivity analysis exclude children who smoke: \n", "n=", twovisit_nosmoke%>%pull(idnum) %>%unique() %>%length(), " individuals with both a 9 and 15 year visit")
+n_twovisitSmkExclusions<-paste0("n=", (twovisit_secondhand%>%pull(idnum) %>%unique() %>%length())-(twovisit_nosmoke%>%pull(idnum) %>%unique() %>%length()), " individuals smoking at \n either 9 and 15 year visit or \n missing focal child smoking data")
+
+```
+
+```{r drawFlowchart}
+graph1<-DiagrammeR::grViz("
+   digraph graph2 {
+   compound=true;
+   graph [layout = dot]
+   
+   node [shape = rectangle, width=4]
+   a [label = '@@1']
+   b [label = '@@2']
+   c [label = '@@3']
+   d [label = '@@4']
+   e [label = '@@5']
+   f [label = '@@6']
+   g [label = '@@7']
+   h [label = '@@8']
+   i [label = '@@9', group=g1]
+   j [label = '@@10']
+   k [label = '@@16']
+   l [label = '@@17']
+   m [label = '@@19']
+   
+   #fake nodes for connecting to edges
+   node [shape=point, width=0.01, height=0.01]
+   a1
+   b1
+   c1
+   d1
+#   e1
+  f1 [group=g1]
+  g1
+  k1
+   
+  #exclusion nodes
+  node [shape = rectangle, width=4]
+  aa [label = '@@20']
+  bb [label = '@@11']
+  cc [label = '@@12']
+  dd [label = '@@13']
+  ff [label = '@@14', width=3]
+  gg [label = '@@15', width=3]
+  kk [label = '@@18', width=3]
+    
+  #draw connections
+  a->m
+  m->a1 [arrowhead=none]
+  a1->b
+  b->b1 [arrowhead=none]
+  b1->c
+  c->c1 [arrowhead=none]
+  c1->d
+  d->d1 [arrowhead=none]
+  d1->e
+  e->f; e->g; e->k
+{rank=same; h->e [dir=back, minlen=2, style=dashed]}
+  f->f1 [arrowhead=none, style=dashed]
+  g->g1 [arrowhead=none, style=dashed]
+  k->k1 [arrowhead=none, style=dashed]
+  f1->i [style=dashed]
+  g1->j [style=dashed]
+  k1->l [style=dashed]
+  
+{rank=same; a1->aa [minlen=2]}   
+{rank=same; b1->bb [minlen=2]} 
+{rank=same; c1->cc [minlen=2]}
+{rank=same; d1->dd [minlen=2]}
+{rank=same; f1->ff [minlen=2]}
+{rank=same; g1->gg [minlen=2]}
+{rank=same; k1->kk [minlen=2]}
+
+#invisible constraints to force ordering
+ff->i [style=invis]
+   }   
+   
+   [1]: n_fullFF
+   [2]: n_methylFF
+   [3]: n_basemodel
+   [4]: n_prenatalexposures
+   [5]: n_secondhandSmk
+   [6]: n_Child
+   [7]: n_Teen
+   [8]: n_sensFatherSmoking
+   [9]: n_ChildSmkexcluded
+   [10]: n_TeenSmkexcluded
+   [11]: n_baseexclusions
+   [12]: n_prenatalexclusions
+   [13]: n_secondhandexclusions
+   [14]: n_ChildSmkexclusions
+   [15]: n_TeenSmkexclusions
+   [16]: n_twovisits
+   [17]: n_twovisitsSmkExcluded
+   [18]: n_twovisitSmkExclusions
+   [19]: n_methylQC
+   [20]: n_QCloss
+")
+```
+
+```{r drawGraph}
+graph1
+```
+
+## Cell type proportions over time 
+
+```{r, eval=F, include=F}
+cellbytime<-myFF %>% pivot_longer(cols=c(Fib, Epi, IC), names_to="Celltype", values_to = "Proportion")
+ggplot(cellbytime, aes(x=childteen, y=Proportion, color=childteen))+geom_violin()+geom_boxplot(width=0.2)+facet_wrap(~Celltype)+stat_compare_means(label="..p.signif..")+ggtitle("Cell type proportions by visit")
+
+ggplot(myFF, aes(x=childteen, y=globalmethylation, color=childteen))+geom_violin()+geom_boxplot(width=0.2)+stat_compare_means(label="..p.signif..")+ggtitle("Global methylation by visit")
+
+ggplot(myFF, aes(x=childteen, y=pediatric, color=childteen))+geom_violin()+geom_boxplot(width=0.2)+stat_compare_means(label="..p.signif..")+ggtitle("Pediatric methylation clock by visit")
+ggplot(myFF, aes(x=pediatric, y=IC))+geom_point()+stat_cor()+facet_wrap(~childteen)+ggtitle("Correlation between pediatric clock and IC proportion")
+#ggplot(myFF, aes(x=pediatric, y=Epi))+geom_point()+stat_cor()+facet_wrap(~childteen)
+#ggplot(myFF, aes(x=childteen, y=levine, color=childteen))+geom_violin()+geom_boxplot(width=0.2)+stat_compare_means(label="..p.signif..")
+ggplot(myFF, aes(x=childteen, y=cg05575921, color=childteen))+geom_violin()+geom_boxplot(width=0.2)+stat_compare_means(label="..p.signif..")+ggtitle("Methylation at cg05575921 by visit")
+
+```
+Cell type proportions do differ between 9 and 15 year visits and although global methylation does not look different between these visits, methylation clocks do (a good check), although, interestingly, cell type proportion does correlate with methylation age. 
+
+## Distributions & checks of methylation variables 
+
+### Correlation between all methylation data
+```{r}
+methylation_data<-myFF %>% select(colnames(methyldata))%>%select(-MethID, -childteen, -idnum, -slide, -array)
+chart.Correlation(methylation_data, histogram=T)
+```
+
+### Correlation between polymethylation scores
+```{r}
+chart.Correlation(methylation_data %>%select(SSolder_notransform, SSnewbornCT_notransform, SSnewborn_notransform, anynewborn_notransform))
+```
+
+Thought this was a little weird, investigated the actual coefficients for each score: 
+
+```{r}
+coefs_methyl<-cbind('SSolderCoefs'=cpgs$SSolder$Coef, 'SSnewbornCTCoefs'=cpgs$SSnewbornCT$Coef, 'SSnewbornCoefs'=cpgs$SSnewborn$Coef, 'anynewbornCoefs'=cpgs$anynewborn$Coef)
+chart.Correlation(coefs_methyl)
+```
+
+```{r correlaton b/t polymethylation scores over time, eval=F}
+PMS<-methyldata %>%select(idnum, childteen, colnames(polyscores_wide), -MethID)%>%pivot_longer(cols=any_of(colnames(polyscores_wide)), names_to="PMS_type", values_to="PolymethylationScore")%>%pivot_wider(names_from = childteen, values_from=PolymethylationScore)
+ggplot(PMS, aes(x=C, y=T))+geom_point()+facet_grid(~PMS_type)+stat_cor()+geom_smooth(method=lm)
+```
+```{r Polymethylation scores over time}
+gg_newborn<-ggplot(methyldata, aes(x=childteen, y=SSnewbornCT_center, group=idnum))+geom_point()+geom_line(alpha=0.2)+geom_smooth(aes(group=1), method='lm')+ggtitle("SS newborn (+CT)")
+gg_older<-ggplot(methyldata, aes(x=childteen, y=SSolder_center, group=idnum))+geom_point()+geom_line(alpha=0.2)+geom_smooth(aes(group=1), method='lm')+ggtitle("SS older")
+plot_grid(gg_newborn, gg_older, nrow = 2)
+```
+```{r Polymethylation scores over time by prenatal smoke}
+gg_newborn<-ggplot(myFF, aes(x=childteen, y=SSnewbornCT_center, group=idnum, color=smkPreg_binary))+geom_point()+geom_line(alpha=0.2)+geom_smooth(aes(group=1),color='black', method='lm')+facet_wrap(~smkPreg_binary)
+gg_older<-ggplot(myFF, aes(x=childteen, y=SSolder_center, group=idnum, color=smkPreg_binary))+geom_point()+geom_line(alpha=0.2)+geom_smooth(aes(group=1),color='black', method='lm')+facet_wrap(~smkPreg_binary)
+plot_grid(gg_newborn, gg_older, nrow=2)
+```
+
+
+
+```{r boxplots of PMS}
+PMS<-left_join(methyldata %>%select(idnum, childteen, colnames(polyscores_wide), -MethID)%>%pivot_longer(cols=any_of(colnames(polyscores_wide)), names_to="PMS_type", values_to="PolymethylationScore"), myFF[, c('idnum', 'smkPreg_binary')]%>%unique())
+ggplot(PMS, aes(x=childteen, y=PolymethylationScore, color=smkPreg_binary))+geom_boxplot()+facet_wrap(~PMS_type)+stat_compare_means(label='p.signif', label.y=4)
+
+```
+
+
+
+
+## Distribution of main predictor and bivariate tables (stratified by ancestry)
+
+### Covariates by main predictor (unstratified)
+
+```{r, pickData}
+tabledata<-rbind(child_nosmoke, teen_nosmoke)
+tabledata<-set_label(tabledata, varLabels4)
+
+```
+
+```{r, warning=F, message=F}
+smk_all<-strataTable(createTable(compareGroups(smkPreg_binary~globalmethylation+SSnewbornCT_notransform+SSolder_notransform+cg05575921+pediatric+levine+Epi+Fib+IC+cm1inpov+cm1ethrace+cm1bsex+m1g2_YesNoPreg+m1g3_YesNoPreg+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth+k5f1l+k6d40+f1g4, data=tabledata, simplify = F), show.all=F), 'childteen')
+export2md(smk_all)
+```
+
+Note hypomethylation in exposed children at cg05575291 (AHHR) gene, which is more strongly associated at the Teen visit than the Child visit.... although not a very small p-value - check with Kelly - is this concerning?  
+
+Additionally, cell type proportion does not appear to associate with main predictor of binary prenatal smoking variable. 
+
+### Covariates by main predictor (stratified by ancestry)
+These tables use the base model group from the above CONSORT diagram (n=844). 
+```{r, warning=F, message=F}
+smkA<-strataTable(createTable(compareGroups(smkPreg_binary~globalmethylation+SSnewbornCT_notransform+SSolder_notransform+cg05575921+pediatric+levine+Epi+Fib+IC+cm1inpov+cm1ethrace+cm1bsex+m1g2_YesNoPreg+m1g3_YesNoPreg+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth+k5f1l+k6d40+f1g4, data=tabledata%>%filter(ancestry=='African ancestry')%>%copy_labels(tabledata)), show.all=F), 'childteen')
+export2md(smkA, caption="Smoked during pregnancy vs covariates: African ancestry only")
+smkE<-strataTable(createTable(compareGroups(smkPreg_binary~globalmethylation+SSnewbornCT_notransform+SSolder_notransform+cg05575921+pediatric+levine+Epi+Fib+IC+cm1inpov+cm1ethrace+cm1bsex+m1g2_YesNoPreg+m1g3_YesNoPreg+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth+k5f1l+k6d40+f1g4, simplify=FALSE, data=tabledata%>%filter(ancestry=='European ancestry' & SmkAtVisitPastmonth!="Missing")%>%copy_labels(tabledata)), show.all=TRUE), 'childteen')
+export2md(smkE, caption="Smoked during pregnancy vs covariates: European ancestry only")
+smkH<-strataTable(createTable(compareGroups(smkPreg_binary~globalmethylation+SSnewbornCT_notransform+SSolder_notransform+cg05575921+pediatric+levine+Epi+Fib+IC+cm1inpov+cm1ethrace+cm1bsex+m1g2_YesNoPreg+m1g3_YesNoPreg+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth+k5f1l+k6d40+f1g4, data=tabledata%>%filter(ancestry=='Hispanic ancestry')%>%copy_labels(tabledata)), show.all=F), 'childteen')
+export2md(smkH, caption="Smoked during pregnancy vs covariates: Hispanic ancestry only")
+
+```
+
+When stratified by ancestry, relationship between cg05575291 methylation and smoking remains in African ancestry group, pattern of hypomethylation exists in teen measures of European ancestry group but not child measures, and actually non-significant hypermethylation in Hispanic ancestry group. 
+
+
+## Correlation plots between all continuous variables
+
+```{r, eval=F, include=F, eval=F}
+cont_data<-myFF %>% select(globalmethylation, cg05575921, pediatric, levine, Epi, Fib, IC, myContinuous)%>%mutate_at(vars(myContinuous), funs(as.numeric(ifelse(.<0, NA, .))))
+chart.Correlation(cont_data, histogram=T)
+```
+
+## Associations with global methylation 
+```{r, eval=F, include=F}
+#use desc tools here 
+myFFbin<-myFF%>%mutate_at(vars(all_of(myBinary)), funs(recode_factor(., '-1 Refuse'='Missing', "-2 Don't know"="Missing", "-9 Not in wave"="Missing", "-3 Missing"="Missing", "-6 Skip"="Missing", "-7 N/A"="Missing", "-5 Not asked"="Missing")))
+paste("globalmethylation~", paste(myBinary, collapse="+"), sep='')
+z<-Desc(globalmethylation~m1g5+m1g6+m1h3a+m1i4a+f1h3a+m2j5+m2j7+f2j5+f2j7+f3j31+m4j18+f4j18+k5f1k+k5f1l+m5g17+f5g17+n5f17+p5h15+p6h74+k6d40+k6d45, data=myFFbin%>%filter(childteen=='C'), plotit = F)
+x<-Desc(globalmethylation~m1g5+m1g6+m1h3a+m1i4a+f1h3a+m2j5+m2j7+f2j5+f2j7+f3j31+m4j18+f4j18+k5f1k+k5f1l+m5g17+f5g17+n5f17+p5h15+p6h74+k6d40+k6d45, data=myFFbin%>%filter(childteen=='T'), plotit = F)
+
+plot(Desc(globalmethylation~smkPreg_binary+m2j5+n5f17, data=myFFbin %>%filter(childteen=='C'), main=c("Binary pregnancy smoke variable", "Mother smoke cig - Year 1", "PCG smoke cig - Year 9")), type='dens')
+
+plot(Desc(globalmethylation~smkPreg_binary+m2j5+m5g17, data=myFFbin %>%filter(childteen=='T'), main=c("Binary pregnancy smoke variable (teen methyl)", "Mother smoke cig - Year 1 (teen methyl)", "Mother smoke cig - Year 9 (teen methyl)")), type='dens')
+
+
+myFFcat<-myFF%>%mutate_at(vars(all_of(c(myCategorical_O, myCategorical_U))), funs(recode_factor(., '-1 Refuse'='Missing', "-2 Don't know"="Missing", "-9 Not in wave"="Missing", "-3 Missing"="Missing", "-6 Skip"="Missing", "-7 N/A"="Missing", "-5 Not asked"="Missing")))
+paste("globalmethylation~", paste(c(myCategorical_O, myCategorical_U), collapse="+"), sep='')
+cat_oC<-Desc(globalmethylation~m1g2+m1g3+m1g4+f1g4+m2j5a+m2j7a+f2j5a+f2j7a+f3j32+m4j19+f4j19+m5g18+f5g18+n5f18+p5q3cr+p6h76+p6h77+k6d42+k6d43+k6d46+k6d47+cm1bsex+m1h3+m1h3b+cm1ethrace+m1i4+m1i4b+f1h3+f1h3b+cf1ethrace, data=myFFcat%>%filter(childteen=='C'), plotit = F)
+#n5f18 p6h76 cf1ethrace m1h3 (ethnicity) cm1bsex
+cat_oT<-Desc(globalmethylation~m1g2+m1g3+m1g4+f1g4+m2j5a+m2j7a+f2j5a+f2j7a+f3j32+m4j19+f4j19+m5g18+f5g18+n5f18+p5q3cr+p6h76+p6h77+k6d42+k6d43+k6d46+k6d47+cm1bsex+m1h3+m1h3b+cm1ethrace+m1i4+m1i4b+f1h3+f1h3b+cf1ethrace, data=myFFcat%>%filter(childteen=='T'), plotit = F)
+#m2j5a
+
+plot(Desc(globalmethylation~cm1bsex, data=myFFbin %>%filter(childteen=='T'), main=c("Baby sex")), type='dens')
+
+plot(Desc(globalmethylation~p6h74, data=myFF %>%filter(childteen=='T'), main=c("PCG ever smoked cigarretes")), type='dens')
+plot(Desc(globalmethylation~p6h76, data=myFF %>%filter(childteen=='T'), main=c("How often PCG smoked cigarretes past month")))
+plot(Desc(globalmethylation~p6h76, data=myFFcat %>%filter(childteen=='T'), main=c("How often PCG smoked cigarretes past month")), type='dens')
+
+
+
+```
+
+At child and teen visit, variables to do with Father and Mother hispanic identity and ethnicity associated with global methylation, as did baby sex. 
+
+Some maternal/primary care giver smoking variables from year 1, 9 and 15 also associated. A note on the question PCG Year 9 Smoke and related questions n5f17 and n5f18 - these variables are weird, with lots of missing values, need to check the FF question guide, but my impression is that they were only asked to children for whom the PCG was not the mom (PCG and Core mother survey were combined in wave 6 - year 15). 
+
+## Associations with cg05575921 methylation and other significant sites from Wiklund et al 2019
+
+Base model controls for ancestry, childsex, maternal income to poverty ratio, Epi cells, IC cells, and child age in months at sample. 
+```{r}
+#define function for use in purr 
+apriori_fun = function(response, dat, groupF, vars){
+  exclude=ifelse(groupF=='C', 'cp6yagem', ifelse(groupF=='T', 'cm5b_age', NA))
+  vars=vars[vars!=exclude]
+  form=paste0(response, "~", paste(vars, collapse='+'))
+  tidy(lm(as.formula(form), data=dat %>% filter(childteen==groupF)), conf.int=T, conf.level=0.95)
+}
+
+#read in top CpGs from Table One of Wicklund et al 2019
+topCPGs<-read.csv(paste0(datadir, "TopCpGsWiklundEtAl2019.csv"))
+topCPGs<-topCPGs %>% filter(CpG %in% aprioriCG)%>% mutate(estimate=as.numeric(gsub("−\\s", "-", gsub(" .*", "", β..SE.))), std.error=as.numeric(sub("\\).*", "", sub(".*\\(", "", β..SE.))), p.value=P.value, source="Wiklund et al. 2019", conf.low=(estimate-1.96*std.error), conf.high=(estimate+1.96*std.error))%>%select(CpG, Chr, Position, Gene, estimate, std.error, p.value, conf.low, conf.high, source)
+
+#purr over the aprioriCpGs
+vars=aprioriCG
+vars=purrr::set_names(vars)
+#ages=c('C', 'T')
+#ages=purrr::set_names(ages)
+models_C=  vars%>% purrr::map(apriori_fun, dat=basemodeldata, groupF='C', vars=basemodelvar)
+models_T=  vars%>% purrr::map(apriori_fun, dat=basemodeldata, groupF='T', vars=basemodelvar)
+models=list('child'=models_C, 'teens'=models_T)
+#pull out list of tidy models into a datafram 
+modeldf<-left_join(bind_rows(unlist(models, recursive=F), .id="id") %>% filter(term=='smkPreg_binaryYes')%>%mutate(source=paste0("Fragile Families: ", age=gsub("\\..*", "", id)), CpG=gsub(".*\\.", "", id)), topCPGs %>%select(CpG, Chr, Position, Gene))%>%select(CpG, Chr, Position, Gene, estimate, std.error, p.value, conf.low, conf.high, source)
+
+#combine
+modeldf<-rbind(modeldf, topCPGs)%>%mutate(label=paste0(Gene, ": ", CpG))
+
+#plot
+ggplot(modeldf, aes(x=estimate, xmin=conf.low, xmax=conf.high, color=source, y=label))+geom_point(position=position_dodge(width=1))+geom_errorbarh(height=0.1, position=position_dodge(width=1))+scale_x_continuous()+scale_y_discrete(name="CpGs (a priori)")+geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+ggtitle("Wiklund 2019 vs Fragile Families at 4 selected a priori CpGs: \n Base model")
+
+```
+
+# Datasets for modeling
+Variables
+
+Base model: Binary smoking variable [X], ancestry categorization, baby sex [X], maternal income to poverty ratio [X],  child's age in month at visit of interest (note, currently using a constructed child's age at visit, where individuals having a missing child's age at home visit was supplemented with child's age at home interview) [X], cell types (Epi + IC, may need to take one out),
+
+Prenatal exposures: Base model variables + prenatal maternal alcohol use (Yes/no) [X], prenatal maternal drug use (yes/no)
+
+Secondhand smoke exposure models: Prenatal exposures model+ any maternal smoking at age 1 & 5 [X], maternal or PCG smoking dose at visit of interest (age 9 or 15) [X]
+
+First hand smoking: Secondhand smoke exposure models + exclude children with missing or reported firsthand smoking at visit of interest (age 9 or 15) 
+
+Paternal smoking: Filter to individuals with data on prenatal paternal smoking and compare effect size of prenatal paternal to prenatal maternal (as per Wiklund et al. 2019, idea is that this captures additional confounding)
+
+Ancestry specific models - by ancestry groups; replace ancestry control with control for local PCs within ancestry group
+
+Longitduinal models - no additional filtering needed
+
+
+```{r, saveData}
+save(child_base, file=paste0(datadir, 'CreatedData/', 'ChildBaseModelData.Rdata'))
+save(teen_base, file=paste0(datadir, 'CreatedData/', 'ChildBaseModelData.Rdata'))
+save(basemodeldata, file=paste0(datadir, 'CreatedData/', 'BaseModelData.Rdata'))
+
+save(child_prenatal, file=paste0(datadir, 'CreatedData/', 'ChildPrenatalExModelData.Rdata'))
+save(teen_prenatal, file=paste0(datadir, 'CreatedData/', 'PrenatalExModelData.Rdata'))
+save(prenatalexdata, file=paste0(datadir, 'CreatedData/', 'PrenatalExModelData.Rdata'))
+
+save(child_secondhand, file=paste0(datadir, 'CreatedData/', 'ChildSecondHandSmkModelData.Rdata'))
+save(teen_secondhand, file=paste0(datadir, 'CreatedData/', 'TeenSecondHandSmkModelData.Rdata'))
+save(twovisit_secondhand, file=paste0(datadir, 'CreatedData/', 'TwoVisitSecondHandSmkModelData.Rdata'))
+save(secondhandsmkdata, file=paste0(datadir, 'CreatedData/', 'SecondHandSmkModelData.Rdata'))
+
+save(child_nosmoke, file=paste0(datadir, 'CreatedData/', 'ChildNoSmkModelData.Rdata'))
+save(teen_nosmoke, file=paste0(datadir, 'CreatedData/', 'TeenNoSmkModelData.Rdata'))
+save(twovisit_nosmoke, file=paste0(datadir, 'CreatedData/', 'TwoVisitNoSmkModelData.Rdata'))
+
+
+save(fathersmkdata, file=paste0(datadir, 'CreatedData/', 'FatherSmkModelData.Rdata'))
+
+
+save(list=c("basemodeldata", "prenatalexdata", "secondhandsmkdata", "child_secondhand", "teen_secondhand", "twovisit_secondhand", "twovisit_nosmoke", "child_nosmoke", "teen_nosmoke", "fathersmkdata"), file=paste0(datadir, 'CreatedData/', Sys.Date(), 'CreatedData.Rdata'))
+```
+

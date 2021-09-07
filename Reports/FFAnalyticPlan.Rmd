@@ -1,0 +1,285 @@
+---
+title: "Fragile Families Smoking Analysis"
+author: "Freida Blostein"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    code_folding: show
+    highlight: tango
+    number_sections: yes
+    theme: sandstone
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/")
+knitr::opts_knit$set(message=FALSE)
+knitr::opts_knit$set(warning=FALSE)
+library(tidyr)
+library(dplyr)
+library(compareGroups)
+library(kableExtra)
+library(haven)
+library(sjlabelled)
+library(matchmaker)
+```
+
+# Objectives & Hypotheses 
+ A) Conduct an ancestry-stratified epigenome wide association study of prenatal maternal smoking and DNA methylation from child saliva samples at age nine and age fifteen. B) Examine differences in methylation trajectories from age nine to fifteen of the most significant methylation sites identified in the epigenome-wide association study between those exposed vs unexposed to prenatal smoking. C) Develop a saliva epigenetic classifier of prenatal smoke exposure using a machine learning approach and support vector machines and evaluate the agreement of the classifier at two time points. 
+ 
+Hypotheses: I hypothesize that different CpG loci will be associated with maternal prenatal smoking in African ancestry groups than in European and Hispanic ancestry groups. I hypothesize that the direction of associations between CpGs and prenatal maternal smoking will stay consistent between ages nine and fifteen but that the magnitude of associations will decline over time. Finally, I hypothesize that classification of prenatal maternal smoking status based upon DNA methylation information from salivary samples will be accurate and consistent at ages nine and fifteen. 
+
+# Reading in data and preprocessing: 
+
+# # Labeling phenotype data
+```{r, phenotypedataReadinLabel, results='hide', warnings=FALSE}
+pheno<-readRDS("/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/OGData/fullpheno.rds")
+
+#Phenotype labeling & filtering to variables of interest
+#labels
+#to set labels using sjlabelled, needed to fix multibyte characters 
+#https://stackoverflow.com/questions/4993837/r-invalid-multibyte-string
+find_offending_character <- function(x, maxStringLength=256){  
+  print(x)
+  for (c in 1:maxStringLength){
+    offendingChar <- substr(x,c,c)
+    #print(offendingChar) #uncomment if you want the indiv characters printed
+    #the next character is the offending multibyte Character
+  }    
+}
+#lapply(attributes(pheno)$var.labels, find_offending_character)
+attributes(pheno)$var.labels<-gsub("\xad", "'",  attributes(pheno)$var.labels)
+#lapply(attributes(pheno)$var.labels, find_offending_character)
+attributes(pheno)$var.labels<-gsub("\x92", "'",  attributes(pheno)$var.labels)
+#lapply(attributes(pheno)$var.labels, find_offending_character)
+pheno<-set_label(pheno, c(attributes(pheno)$var.labels, 'ID'))
+#value labels 
+label_list<- attributes(pheno)$label.table
+label_list[[12876]]<-NA
+pheno<-set_labels(pheno, labels=attributes(pheno)$label.table)
+names(label_list)<-attributes(pheno)$names
+ pheno<-set_labels(pheno, labels=label_list)
+#define vars of interest 
+idvars<-c("id", "ff_id")
+demovars<-c("cm1age", "cm1bsex", "cm1ethrace", "m1h3", "m1h3a", "m1h3b", "m1i4", "m1i4a", "m1i4b", "cf1age", "cf1ethrace", "f1h3", "f1h3a", "f1h3b")
+smokingvars<-c("m1g4", "f1g4", "f2j5", "f2j5a", "f2j7", "f2j7a", "f3j31", "f3j32", "f4j18", "f4j19", "f5g17", "f5g18", "k5f1k", "k5f1l", "k6d40", "k6d41", "k6d41", "k6d42", "k6d43", "k6d45", "k6d46", "k6d47", "m2j5", "m2j5a", "m2j7", "m2j7a", "m4j18", "m4j19", "m5g17", "m5g18", "n5f17", "n5f18", "p3a22", "p3a23", "p3a23a", "p3a23b", "p3a24", "p4a22", "p4a23", "p5h15", "p5h15b", "p5q3cr", "p6h74", "p6h75", "p6h76", "p6h77", "p6h78")
+prenataldrugusevar<-c("m1g2", "m1g3", "m1g5", "m1g6")
+#filter to these variables
+#FF has data inoriginal form +sjlabelled value labels
+#since these dont' show in compareGroups
+#also will make FF_labeled, where categorical, binary variables
+#will be replaced with their labels
+FF<-pheno %>% select(one_of(idvars), one_of(demovars), one_of(smokingvars), one_of(prenataldrugusevar))
+#create FF_labeled
+#read in csv with metadata about variables 
+FFmeta<-read.csv("/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/FFMetadata_v07.csv")
+#create long data dictionary  
+FFlong<-FFmeta%>% select(new_name, contains('value'), contains('label')) %>% pivot_longer(cols = contains("value"), names_to="value", values_to="old_values")
+FFlong<-FFlong%>%pivot_longer(cols = contains("label"), names_to="label", values_to="new_labels")
+recodes_long<-FFlong %>% filter(gsub("value", "", value)==gsub("label", "", label)& !is.na(old_values)) %>% select(new_name, old_values, new_labels) 
+#store continuous, binary, categorical etc
+FFmyMeta<-FFmeta %>% filter(new_name %in% c(idvars, demovars, smokingvars, prenataldrugusevar))
+myContinuous<-FFmyMeta %>% filter(type=="Continuous") %>%pull(new_name); myContinuous<-colnames(FF)[colnames(FF) %in% myContinuous]
+myBinary<-FFmyMeta%>%filter(type=="Binary")%>%pull(new_name); myBinary<-colnames(FF)[colnames(FF) %in% myBinary]
+myCategorical_O<-FFmyMeta%>%filter(type=="Ordered Categorical")%>%pull(new_name); myCategorical_O<-colnames(FF)[colnames(FF) %in% myCategorical_O]
+myCategorical_U<-FFmyMeta%>%filter(type=="Unordered Categorical")%>%pull(new_name); myCategorical_U<-colnames(FF)[colnames(FF) %in% myCategorical_U]
+#filter to only vars of interest - not continuous variables  
+myRecodes<-recodes_long %>% filter(new_name %in% c(myBinary, myCategorical_O, myCategorical_U))
+#apply matchmaker
+FF_labeled<-match_df(FF, dictionary=myRecodes, from = 'old_values', to='new_labels', by='new_name')
+#reapply correct variable class types 
+FF_labeled<-FF_labeled %>% mutate_at(vars(any_of(c(myBinary, myCategorical_O, myCategorical_U))), funs(as.factor(.))) %>% 
+          mutate_at(vars(any_of(myContinuous)), funs(as.numeric(na_if(na_if(., "-3"), '-9'))))
+#read back in the variable labels 
+FF_labeled<-set_label(FF_labeled, get_label(FF))
+```
+
+# # Cleaning pdqc data 
+# # # Figure out analytic subsets 1) any methylation data; 2) 2-visits of methylation data
+```{r, pdqcReadin}
+pdqc<-readRDS("/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/OGData/pdqc.rds")
+#What FF ids have methylation data?
+methy_ids<-pdqc$id
+#ids with 9visit, 15visit or both visit
+visit9ids<-pdqc%>%filter(childteen=='C')%>%pull(idnum)%>%unique()
+visit15ids<-pdqc%>%filter(childteen=='T')%>%pull(idnum)%>%unique()
+bothvisit_ids<-visit9ids[visit9ids %in% visit15ids]
+visit9only_ids<-visit9ids[!(visit9ids %in%bothvisit_ids)]
+visit15only_ids<-visit15ids[!(visit15ids %in%bothvisit_ids)]
+```
+
+```{r, createAnalyticSubsetFlags}
+#create flag in FF for having methylation data
+#and flag for having 2 visits of methylation data
+FF_labeled<-FF_labeled %>% 
+  mutate(MethylData=ifelse(id %in% methy_ids, "Analysis subset", "Not in analysis subset"),
+         TwoVisitData=ifelse(id%in%bothvisit_ids,"Analysis subset - both visits", "Not in both visit analysis subset"))
+table(FF_labeled$MethylData)
+table(FF_labeled$TwoVisitData)
+```
+
+```{r, checkIDlengths}
+if((length(visit15only_ids)+length(visit9only_ids)+length(bothvisit_ids)!=length(FF_labeled %>% filter(MethylData=="Analysis subset")%>%pull(id)))){print("WARNING ID LENGTHS DO NOT ADD UP")}
+if(length(bothvisit_ids)!=length(FF_labeled %>% filter(TwoVisitData=="Analysis subset - both visits")%>%pull(id))){print("WARNING ID LENGTHS DO NOT ADD UP")}
+```
+
+# # # Filter technical replicates (only 1 technical replicate per person-visit + decide based on QC variables - pick the one with the lower probe fail percentage)
+
+```{r}
+#technical replicates will be duplicate id + childteen variables from pdqc
+pdqc<-pdqc %>% mutate(newID=paste(idnum, childteen, sep='_'))
+techrep_ids<- pdqc %>% select(newID) %>% group_by(newID)%>%filter(n()>1)
+techreps<-pdqc %>% filter(newID %in% techrep_ids$newID)%>%arrange(idnum,childteen)
+hiPctPF<-techreps %>% group_by(newID) %>%filter(probe_fail_pct==max(probe_fail_pct))%>%pull(MethID)
+pdqc_clean<-pdqc %>% filter(!(MethID %in% hiPctPF) & childteen!='M')
+myMethIDs<-pdqc_clean %>% pull(MethID)
+```
+
+
+# # Methylation summary variables
+
+# # # Clocks
+
+```{r, readInclocks}
+clocks<-read.table(file="/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/OGData/DNAm_clocks_ffcw.txt", header = T)
+colnames(clocks)[1]<-"MethID"
+```
+
+
+# # # Global methylation score 
+
+```{r}
+betaqc<-readRDS(file="/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/OGData/betaqc.rds")
+globalmethy<-colMeans(betaqc, na.rm=T)
+
+methyldata<-left_join(pdqc_clean %>% select(MethID, childteen, idnum), left_join(as.data.frame(cbind("MethID"=names(globalmethy), "globalmethylation"=globalmethy)), clocks))
+methyldata_wide <- methyldata %>% select(-MethID)%>% pivot_wider(., names_from=childteen, values_from=c(globalmethylation, horvath13, horvath18, pediatric, levine))
+```
+
+
+# # # Different options for methylation scores (islands; shores)
+
+# # Creation of new variables
+# # # Binary smoking variable
+```{r}
+FF_labeled<-FF_labeled %>%mutate(smkPreg_binary=ifelse(m1g4%in% c("1 2+pk/d","2 1<pk<2","3 <1pk/d" ), "Yes", ifelse(m1g4%in%c("-2 Don't know", "-3 Missing", "-9 Not in wave"), NA, ifelse(m1g4== "4 None", "No", "FLAG"))))
+xtabs(~m1g4+smkPreg_binary, data=FF_labeled)
+```
+
+# # # Ancestry variables
+
+Ancestry is based on csv files of ancestry-specific PCS created by erin (per Jonah meeting Oct 6 2020). If an ID was in {african/european/hispanic}, then the individual is labeled as such. 
+```{r}
+# read in PCs
+euroPC<-read.csv("/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/OGData/pcs/european.csv")
+afrPC<-read.csv("/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/OGData/pcs/african.csv")
+hisPC<-read.csv("/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/OGData/pcs/hispanic.csv")
+allPC<-read.table("/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/OGData/pcs/global_pcs.txt", header=T)
+#individuals in each ancestry specific pc group can be labeled as that ancestry for categorical ancestry variable 
+FF_labeled<-FF_labeled %>% mutate(ancestry=case_when(MethylData=="Analysis subset" & id %in% hisPC$idnum~"Hispanic ancestry", MethylData=="Analysis subset" & id %in%afrPC$idnum~"African ancestry", MethylData=="Analysis subset" & id %in% euroPC$idnum~"European ancestry", MethylData=="Analysis subset" & !(id %in%c(hisPC$idnum, afrPC$idnum, euroPC$idnum))~"Missing PC data", MethylData!="Analysis subset"~"Not in analysis subset"))
+#check ancestry variable
+table(FF_labeled$ancestry)
+with(FF_labeled, xtabs(~ancestry+cm1ethrace))
+MissingPCdata<-FF_labeled %>% filter(ancestry=="Missing PC data")%>%select(id)
+save(MissingPCdata, file = "/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/CreatedData/MissingPC.Rdata")
+```
+
+There were `r length(MissingPCdata$id)` individuals without PC data. 
+
+
+# A)Conduct an ancestry-stratified epigenome wide association study of prenatal maternal smoking and DNA methylation from child saliva samples at age nine and age fifteen.  
+
+# # Comparison of analytic sample - methylation data to Fragile Families sample 
+
+```{r, warnings=F}
+methyl<-createTable(compareGroups(MethylData~.-id-ff_id, data=FF_labeled), show.all=T)
+export2md(methyl)
+```
+
+
+# # Comparison of analytic sample - two visits of methylation data to Fragile Families sample 
+
+```{r, warnings=F}
+twovisit<-createTable(compareGroups(TwoVisitData~.-id-ff_id, data=FF_labeled), show.all=T)
+export2md(twovisit)
+```
+
+# # Flow chart of sample exclusions
+
+# # Comparison of variables by ancestry 
+```{r, warning=F, message=F}
+myFF<-FF_labeled %>% filter(MethylData=="Analysis subset")
+myFF<-left_join(myFF, methyldata%>%mutate(id=idnum))
+myFF<-set_label(myFF, get_label(FF_labeled))
+ancestrytable<-createTable(compareGroups(ancestry~.-id-ff_id-idnum, data=myFF), show.all=T)
+export2md(ancestrytable)
+```
+
+# # Distribution of main predictor and bivariate tables (stratified by ancestry)
+
+# # # Not stratified by ancestry 
+
+```{r, warning=F, message=F}
+smk_C<-createTable(compareGroups(smkPreg_binary~.-id-ff_id-idnum,data=myFF%>%filter(childteen=='C'), simplify=F), show.all=T)
+smk_T<-createTable(compareGroups(smkPreg_binary~.-id-ff_id-idnum,data=myFF%>%filter(childteen=='T'), simplify=F), show.all=T)
+export2md(smk_C)
+export2md(smk_T)
+```
+
+# # # Bivariate tables stratified by ancestry 
+```{r}
+smkA_C<-createTable(compareGroups(smkPreg_binary~.-id-ff_id-idnum,data=myFF%>%filter(childteen=='C' & ancestry=='African ancestry'), simplify=F), show.all=T)
+smkA_T<-createTable(compareGroups(smkPreg_binary~.-id-ff_id-idnum,data=myFF%>%filter(childteen=='T' & ancestry=='African ancestry'), simplify=F), show.all=T)
+export2md(smkA_C)
+export2md(smkA_T)
+
+smkE_C<-createTable(compareGroups(smkPreg_binary~.-id-ff_id-idnum,data=myFF%>%filter(childteen=='C' & ancestry=='European ancestry'), simplify=F), show.all=T)
+smkE_T<-createTable(compareGroups(smkPreg_binary~.-id-ff_id-idnum,data=myFF%>%filter(childteen=='T' & ancestry=='European ancestry'), simplify=F), show.all=T)
+export2md(smkE_C)
+export2md(smkE_T)
+
+smkH_C<-createTable(compareGroups(smkPreg_binary~.-id-ff_id-idnum,data=myFF%>%filter(childteen=='C' & ancestry=='Hispanic ancestry'), simplify=F), show.all=T)
+smkH_T<-createTable(compareGroups(smkPreg_binary~.-id-ff_id-idnum,data=myFF%>%filter(childteen=='T' & ancestry=='Hispanic ancestry'), simplify=F), show.all=T)
+export2md(smkH_C)
+export2md(smkH_T)
+```
+
+
+# # # Covariates by main predictor (stratified by ancestry)
+
+# # # Methylation summary metrics (global score; clocks) by main predictor  (stratified by ancestry; age)
+
+# # Global methylation score analysis 
+
+# # # Overall linear regressions adjusting for ancestry categorization
+
+# # # Ancestry stratified linear regressions
+
+# # # Different options for methylation score analysis - islands; shores etc
+
+# # Epigenetic clock analysis 
+
+# # # Overall linear regressions adjusting for ancestry categorization
+
+# # # Ancestry stratified linear regressions
+
+# # Epigenome wide association analysis 
+
+# # Cell type deconvolution 
+
+# # Comparison of significant CpGs from each ancestry specific EWAS 
+
+# B) Examine differences in methylation trajectories from age nine to fifteen of the most significant methylation sites identified in the epigenome-wide association study between those exposed vs unexposed to prenatal smoking
+
+# # Linear-mixed effect models for longitudinal trajectory of methylation 
+# C) Develop a saliva epigenetic classifier of prenatal smoke exposure using a machine learning approach and ~support vector machines~ targeted maximum likelihood estimation? and evaluate the agreement of the classifier at two time points.
+
+# # Feature selection 
+
+# # 10-fold cross validation 
+
+# # Confusion matrix 
+
+# # Cohen's kappa 

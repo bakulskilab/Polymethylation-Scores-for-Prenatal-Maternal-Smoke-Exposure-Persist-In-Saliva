@@ -1,0 +1,8 @@
+
+This version of R is a base installation only, with no additional
+libraries. The gcc/8.2.0 compiler is being automatically loaded. See
+module help for more information. The gcc/8.2.0 compiler is required in
+order to be able to load additional libraries for your use. If you unload
+the gcc module, you will not be able to install new libraries for R.
+
+

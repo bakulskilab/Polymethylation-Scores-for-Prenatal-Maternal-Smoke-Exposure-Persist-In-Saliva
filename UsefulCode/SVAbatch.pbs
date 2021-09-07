@@ -1,0 +1,21 @@
+#!/bin/bash
+# The interpreter used to execute the script
+
+#“#SBATCH” directives that convey submission options:
+
+#SBATCH --job-name=SVA_morememory
+#SBATCH --mail-type=BEGIN,END
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=90g
+#SBATCH --time=50:00:00
+#SBATCH --account=bakulski1
+#SBATCH --partition=standard
+#SBATCH --output=/nfs/turbo/bakulski1/People/blostein/FF_methylation/Code/UsefulCode/%x-%j.log
+
+
+#module load R
+
+module load R/4.1.0
+
+R CMD BATCH --no-restore --no-save --quiet SVAAnalysis.R SVAAnalysis.out

@@ -1,0 +1,56 @@
+---
+title: "Fragile Families Data Cleaning"
+author: "Freida Blostein"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    code_folding: show
+    highlight: tango
+    number_sections: yes
+    theme: sandstone
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/")
+knitr::opts_knit$set(message=FALSE)
+knitr::opts_knit$set(warning=FALSE)
+library(tidyr)
+library(dplyr)
+library(purrr)
+library(tidyselect)
+library(broom)
+library(compareGroups)
+library(kableExtra)
+library(haven)
+library(sjlabelled)
+library(matchmaker)
+library(EpiDISH)
+library("PerformanceAnalytics")
+library(DescTools)
+library(ggplot2)
+library(ggpubr)
+library(GGally)
+library(ggcorrplot)
+library(ggalluvial)
+library(cowplot)
+datadir<-"/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/"
+john_datadir<-"/nfs/turbo/bakulski1/People/johndou/Fragile_Families/ProcessedFiles/jd"
+outputdir<-"/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Output"
+codedir<-"/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Code"
+```
+
+# Objectives & Hypotheses 
+ A) Conduct an ancestry-stratified epigenome wide association study of prenatal maternal smoking and DNA methylation from child saliva samples at age nine and age fifteen. B) Examine differences in methylation trajectories from age nine to fifteen of the most significant methylation sites identified in the epigenome-wide association study between those exposed vs unexposed to prenatal smoking. C) Develop a saliva epigenetic classifier of prenatal smoke exposure using a machine learning approach and support vector machines and evaluate the agreement of the classifier at two time points. 
+ 
+Hypotheses: I hypothesize that different CpG loci will be associated with maternal prenatal smoking in African ancestry groups than in European and Hispanic ancestry groups. I hypothesize that the direction of associations between CpGs and prenatal maternal smoking will stay consistent between ages nine and fifteen but that the magnitude of associations will decline over time. Finally, I hypothesize that classification of prenatal maternal smoking status based upon DNA methylation information from salivary samples will be accurate and consistent at ages nine and fifteen. 
+
+# Reading in data and preprocessing: 
+
+## Labeling phenotype data
+```{r, phenotypedataReadinLabel, include=F}
+pheno<-readRDS("/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/OGData/fullpheno.rds")
+
+```

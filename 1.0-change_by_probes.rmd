@@ -1,0 +1,157 @@
+---
+title: "Methyl Race Patterns: Probe change frequency"
+author: "Jonah Fisher"
+date: "7/9/2020"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    theme: sandstone
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE
+)
+
+library(minfi)
+library(tidyverse)
+library(reshape2)
+library(plotly)
+```
+
+# Get data and filter down to the samples of interest
+
+```{r create data matrices, eval = F}
+beta <- readRDS("../general_data/betaqc.rds")
+pd <- readRDS("../general_data/pdqc.rds")
+pd <- filter(pd, ck6ethrace %in% 1:3)
+
+commonids <- Reduce(intersect, list(pd$idnum[pd$childteen == "C"], pd$idnum[pd$childteen == "T"]))
+
+pdlist <- list(
+  child = filter(pd, childteen == "C"),
+  teen = filter(pd, childteen == "T")
+)
+
+pdlist$child <- pdlist$child[match(commonids, pdlist$child$idnum),]
+pdlist$teen <- pdlist$teen[match(commonids, pdlist$teen$idnum),]
+
+betalist <- list(
+  child = beta[, match(pdlist$child$MethID, colnames(beta))],
+  teen = beta[, match(pdlist$teen$MethID, colnames(beta))]
+)
+
+betadiffs <- betalist$teen - betalist$child
+betadiffs <- abs(betadiffs)
+```
+
+# Different stratification
+
+## Code for ethrace stratification -- 
+
+```{r create dataframe of differences, eval = F}
+changedf <- data.frame(
+  probes = rownames(betadiffs),
+  All = rowMeans(betadiffs),
+  NHW = rowMeans(betadiffs[, pdlist$child$ck6ethrace == 1]),
+  NHB = rowMeans(betadiffs[, pdlist$child$ck6ethrace == 2]),
+  H = rowMeans(betadiffs[, pdlist$child$ck6ethrace == 3]),
+  bins = ceiling(rowMeans(betalist$child) * 10)
+)
+
+changelong <- melt(changedf, id = c("probes", "bins"))
+
+```
+
+```{r create data frame of numbers of probes in various change degrees by bins, eval = F}
+#We want data points of bin, ethrace group, and count
+countdf <- data.frame(
+  bin = rep(1:10, 4),
+  ethrace = rep(c("All", "NHW", "NHB", "H"), each = 10)
+)
+
+getcounts <- function(lowerb, upperb, basemat = changedf, newmat = countdf){
+  counts <- apply(newmat, 1, function(rowiter){
+    basemat2 <- filter(basemat, bins == as.numeric(rowiter[1]))
+    sum(basemat2[rowiter[2]] > lowerb & basemat2[rowiter[2]] < upperb)
+  })
+  data.frame(
+    newmat,
+    count = counts,
+    change = sprintf("%.3f to %.3f", lowerb, upperb)
+  )
+}
+
+fullcountdf <- rbind(
+  getcounts(0, 0.005),
+  getcounts(0.005, 0.01),
+  getcounts(0.01, 0.03),
+  getcounts(0.03, 0.06),
+  getcounts(0.06, 1)
+)
+
+saveRDS(fullcountdf, "changecounts_bysire.rds")
+```
+
+# Overall count
+
+## Barchart
+
+```{r ggplot of the change stacked bar}
+fullcountdf <- readRDS("changecounts_bysire.rds")
+
+p1 <- ggplot(fullcountdf, aes(x = factor(bin, levels = 1:10), y = count, fill = change)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~ethrace) +
+  xlab("Cutpoint bin of methylation") +
+  ylab("Overall frequency of probe count")
+
+ggplotly(p1)
+
+library(DT)
+widecountdf <- dcast(fullcountdf, bin + change ~ ethrace, value.var = "count")
+write.csv(widecountdf, "probecounts_by_sire.csv", row.names = F)
+
+```
+
+## Data table of overall count
+
+```{r}
+datatable(widecountdf)
+```
+
+# Proportion of probes within each range of change for every given bin and sire
+
+```{r wide count dff}
+widecountdff <- widecountdf
+widecountdff[, 3:6] <- lapply(colnames(widecountdff)[3:6], function(x){
+  lapply(1:10, function(y){
+    vec <- filter(widecountdff, bin == y) %>% select(x) %>% unlist
+    freqs <- round(vec / sum(vec), digits = 5)
+    names(freqs) <- unique(widecountdff$change)
+    freqs
+  }) %>% unlist
+}) %>% bind_cols
+
+fullcountdff <- melt(widecountdff, id.vars = c("bin", "change"), measure.vars = c("All", "NHW", "NHB", "H"))
+colnames(fullcountdff) <- c("bin", "change", "ethrace", "prop")
+  
+p2 <- ggplot(fullcountdff, aes(x = factor(bin, levels = 1:10), y = prop, fill = change)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~ethrace) +
+  xlab("Cutpoint bin of methylation") +
+  ylab("Proportion")
+
+ggplotly(p2)
+
+```
+
+## Data table of proportion of probes for given bin and SIRE that are within the change bin (0.000 - 0.005, 0.005 - 0.001, etc...)
+
+```{r}
+datatable(widecountdff)
+```
+

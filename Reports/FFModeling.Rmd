@@ -1,0 +1,724 @@
+---
+title: "Fragile Families - Epigenome summary metric modeling"
+author: "Freida Blostein"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    code_folding: show
+    highlight: tango
+    number_sections: yes
+    theme: sandstone
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "/nfs/turbo/bakulski1/People/blostein/FF_methylation/")
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+library(tidyr)
+library(stringr)
+library(dplyr)
+library(compareGroups)
+library(kableExtra)
+library(haven)
+library(sjlabelled)
+library(matchmaker)
+library(EpiDISH)
+library("PerformanceAnalytics")
+library(DescTools)
+library(purrr)
+library(broom)
+library(broom.mixed)
+library(ggplot2)
+library(multcomp)
+library(ggpubr)
+library(cowplot)
+library(geepack)
+library(lme4)
+library(lmerTest)
+library(stringr)
+library(sva)
+data.dir="/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/CreatedData"
+outputdir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Output"
+```
+
+```{r Read in data, results='hide'}
+file.path(data.dir, list.files(data.dir))[(str_detect(file.path(data.dir, list.files(data.dir)), 'NoSmk'))]%>%map(load, envir=.GlobalEnv)
+```
+
+```{r make model data}
+modeldata<-rbind(child_nosmoke, teen_nosmoke) # dataset with the most exclusion i.e. squaring dataset off for all models (excluding kids who smoke in figure)
+set_label(modeldata)<-get_label(child_nosmoke)
+```
+
+
+```{r factors in model data}
+modeldata$PostnatalMaternalSmokingAny<-factor(modeldata$PostnatalMaternalSmokingAny, levels=c("No maternal smoking at age 1 and age 5", "Maternal smoking at age 1 or age 5"))
+modeldata$SmkAtVisitPastmonth<-factor(modeldata$SmkAtVisitPastmonth, levels=c("No smoking", "Less than pack a day", "Pack or more a day", "Missing"))
+modeldata$slide<-factor(modeldata$slide)
+modeldata$Sample_Plate<-factor(modeldata$Sample_Plate)
+```
+
+# Bivariate analyses 
+
+## Methylation summary metrics, confounders and precision variables by prenatal maternal smoking, stratified by visit 
+```{r bivariate table summary methylation data}
+export2md(strataTable(createTable(compareGroups(smkPreg_binary~globalmethylation+pediatric+grim+anynewborn_center+SSnewbornCT_center+SSolder_center+Epi+Fib+IC+ChildAgeComposite+cm1inpov+ancestry+cm1bsex+m1g2_YesNoPreg+m1g3_YesNoPreg+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth, data=modeldata)), 'childteen'))
+```
+
+## Methylation summary metrics, confounders and precision variables by prenatal maternal smoking, ancestry stratified at 9 year visit
+
+```{r bivariate table stratified by visit and ancestry child visit}
+export2md(strataTable(createTable(compareGroups(smkPreg_binary~globalmethylation+pediatric+levine+anynewborn_center+SSnewbornCT_center+SSolder_center+Epi+Fib+IC+ChildAgeComposite+cm1inpov+cm1bsex+m1g2_YesNoPreg+m1g3_YesNoPreg+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth, data=modeldata%>%filter(childteen=='C'))), 'ancestry'))
+```
+## Methylation summary metrics, confounders and precision variables by prenatal maternal smoking, ancestry stratified at 15 year visit
+
+```{r bivariate table stratified by visit and ancestry teen visit}
+export2md(strataTable(createTable(compareGroups(smkPreg_binary~globalmethylation+pediatric+grim+anynewborn_center+SSnewbornCT_center+SSolder_center+Epi+Fib+IC+ChildAgeComposite+cm1inpov+cm1bsex+m1g2_YesNoPreg+m1g3_YesNoPreg+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth, data=modeldata%>%filter(childteen=='T'))), 'ancestry'))
+```
+
+
+# Parallel cross-sectional multivariate models of summary methylation variables
+
+```{r Define variables for models crossectional}
+y_vector<-c("globalmethylation", "pediatric", "grim", "anynewborn_center", "SSnewbornCT_center", "SSolder_center")
+###########################
+baseModelvars_local<-"~smkPreg_binary+local_PC1+local_PC2+cm1bsex+cm1inpov+ChildAgeComposite+Epi+IC+Sample_Plate"
+baseModelvars_global<-"~smkPreg_binary+global_PC1+global_PC2+cm1bsex+cm1inpov+ChildAgeComposite+Epi+IC+Sample_Plate"
+###########################
+prenatalModelvars<-paste0(baseModelvars_global, '+m1g2_YesNoPreg+m1g3_YesNoPreg')
+smokeModelvars<-paste0(prenatalModelvars, '+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth')
+predictors<-c('basemodel'=baseModelvars_local, 'prenatalex'=prenatalModelvars, 'secondhand'=smokeModelvars) 
+##############################
+data<-list('childteen'=c("T", "C"), 'outcome'=y_vector)
+args<-data %>%cross_df()
+data2<-list('ancestry'=c('African ancestry', 'Hispanic ancestry', 'European ancestry'), 'outcome'=y_vector)
+args2<-data2 %>%cross_df()
+```
+
+```{r Define model functions}
+model<-function(df, y, x){
+  lm(formula(paste(y, x)), data=df)
+}
+
+model_gee<-function(df, y, x, corstr){
+  geeglm(formula(paste(y, x)), data=df, family=gaussian(link='identity'), id=id, corstr = corstr)
+}
+
+model_lmm<-function(df, y, x){
+  xnew=paste0(x, '+', '(1|id)')
+  lmer(formula(paste(y, xnew)), data=df, REML=F)
+}
+```
+
+
+
+
+## Global models (non-stratified by ancestry)
+
+Three types of models: 
+
+* Base model variables: Yes/No smoking during pregnancy, 1st and 2nd principal components of ancestry from a PCA run in all the children, child sex, maternal income to poverty ratio at birth, child age at interview, epithelial cells, immune cells
+
+* Prenatal exposures model variables: Base model variables + maternal alcohol use during pregnancy (yes/no), maternal other drug use during pregnancy (yes/no)
+
+* Secondhand smoking exposures model variables: Prenatal exposure variables + any postnatal maternal smoking at ages 1 or 5 (yes/no)+maternal smoking packs/day in month prior to maternal interview 
+
+With six different epigenetic summary measurements as outcomes: 
+
+* Global methylation
+
+* Levine clock
+
+* Pediatric clock 
+
+* Polymethylation scores (mean centered), including: 
+  * Constructed using 'any smoking - newborn cordblood' coefficients
+  * Constructed using 'sustained smoking - newborn cordblood + cell-type controlled' coefficients
+  * Constructed using 'sustained smoking - older children' coefficients 
+
+```{r loop global, results='hide'}
+#listOfData<-list("Base model"=basemodeldata, "Prenatal exposures model"=prenatalexdata, "Secondhand smoking exposure model"=secondhandsmkdata, "Firsthand smoking exposure model"=rbind(child_nosmoke, teen_nosmoke))
+listOfData<-list("Base model"=modeldata, "Prenatal exposures model"=modeldata, "Secondhand smoking exposure model"=modeldata)
+###################
+prenatalModelvars<-paste0(baseModelvars_global, '+m1g2_YesNoPreg+m1g3_YesNoPreg')
+smokeModelvars<-paste0(prenatalModelvars, '+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth')
+#predictors<-c('basemodel'=baseModelvars, 'prenatalex'=prenatalModelvars, 'secondhand'=smokeModelvars, 'firsthand'=smokeModelvars)
+predictors<-c('basemodel'=baseModelvars_global, 'prenatalex'=prenatalModelvars, 'secondhand'=smokeModelvars)
+
+listOfNests<-list()
+for(i in 1:length(predictors)){
+  listOfNests[[i]]<-listOfData[[i]]%>%group_by(childteen)%>%nest()
+  listOfNests[[i]]<-left_join(args, listOfNests[[i]], by='childteen')
+  listOfNests[[i]]<-listOfNests[[i]] %>% mutate(model=map2(data, outcome, model, x=predictors[i]), 
+                                                tidied = map(model, tidy, conf.int=T), glanced = map(model, glance), 
+                                                augmented=map(model, augment))%>%
+                                        unnest(tidied)%>%unnest(glanced, names_sep='_')
+}
+names(listOfNests)<-names(listOfData)
+global_models<-listOfNests %>%bind_rows(.id='modeltype')%>%dplyr::select(-data, -model, -augmented)%>%mutate(outcome=factor(outcome, levels=c("globalmethylation", "pediatric", "grim", "anynewborn_center", "SSnewbornCT_center", "SSolder_center"), labels=c('Global methylation', 'Pediatric clock', 'GRIM clock',  'Any smoking polymethylation score (newborns)', 'Sustained smoking polymethylation score (newborns, cell-type controlled', 'Sutained smoking polymethylation score (older children)')))
+```
+
+```{r global models with slide sensitivity}
+###########################
+baseModelvars_global<-"~smkPreg_binary+global_PC1+global_PC2+cm1bsex+cm1inpov+ChildAgeComposite+Epi+IC+slide"
+###########################
+prenatalModelvars<-paste0(baseModelvars_global, '+m1g2_YesNoPreg+m1g3_YesNoPreg')
+smokeModelvars<-paste0(prenatalModelvars, '+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth')
+predictors<-c('basemodel'=baseModelvars_global, 'prenatalex'=prenatalModelvars, 'secondhand'=smokeModelvars) 
+###########################
+listOfNests<-list()
+for(i in 1:length(predictors)){
+  listOfNests[[i]]<-listOfData[[i]]%>%group_by(childteen)%>%nest()
+  listOfNests[[i]]<-left_join(args, listOfNests[[i]], by='childteen')
+  listOfNests[[i]]<-listOfNests[[i]] %>% mutate(model=map2(data, outcome, model, x=predictors[i]), 
+                                                tidied = map(model, tidy, conf.int=T), glanced = map(model, glance), 
+                                                augmented=map(model, augment))%>%
+                                        unnest(tidied)%>%unnest(glanced, names_sep='_')
+}
+names(listOfNests)<-names(listOfData)
+global_models_withslides<-listOfNests %>%bind_rows(.id='modeltype')%>%dplyr::select(-data, -model, -augmented)%>%mutate(outcome=factor(outcome, levels=c("globalmethylation", "pediatric", "grim", "anynewborn_center", "SSnewbornCT_center", "SSolder_center"), labels=c('Global methylation', 'Pediatric clock', 'GRIM clock',  'Any smoking polymethylation score (newborns)', 'Sustained smoking polymethylation score (newborns, cell-type controlled', 'Sutained smoking polymethylation score (older children)')))
+```
+
+
+### Global model fit table
+
+```{r global table of model fit information}
+global.mf<-global_models %>% filter(term=='(Intercept)') %>% dplyr::select(outcome,modeltype, childteen,glanced_nobs, glanced_adj.r.squared, glanced_AIC, glanced_logLik, glanced_p.value)%>%arrange(outcome)%>%mutate(glanced_p.value=as.character(signif(glanced_p.value, 2))) %>%pivot_wider(id_cols = c("outcome", "modeltype"), names_from = childteen, names_glue="{childteen}_{.value}", values_from = c(glanced_nobs, glanced_adj.r.squared, glanced_AIC, glanced_logLik, glanced_p.value))%>%dplyr::select(outcome, modeltype, order(colnames(.)))
+
+global.mf<-global.mf %>% setNames(sub("^[^_]*_([^_]*)*_([^_]*).*", "\\2", colnames(global.mf)))
+
+kable(global.mf, digits=2)%>%kable_classic()%>%add_header_above(c(" "=2, "Age 9 models"=5, "Age 15 models"=5))%>%pack_rows("Global methylation model", 1, 3)%>%pack_rows("Epigenetic clocks", 4, 9)%>%pack_rows("Polymethylation scores", 10, 18)%>%kable_styling(font_size=10)%>%scroll_box(width='100%', height='400px')
+```
+
+
+### Forest plot for any prenatal maternal smoking
+```{r global models forest plot, fig.width=11, fig.height=10}
+main_predictor_global<-global_models %>% filter(term=='smkPreg_binaryYes')%>%mutate(modeltype=factor(modeltype, levels=c("Base model", "Prenatal exposures model", "Secondhand smoking exposure model")))
+
+visit.labs=c('Age 9', 'Age 15'); names(visit.labs)=c('C', 'T')
+
+g1<-ggplot(main_predictor_global%>%filter(outcome %in% levels(main_predictor_global$outcome)[1:3]), aes(x=estimate, xmin=conf.low, xmax=conf.high, color=childteen, y=modeltype))+geom_point(position = position_dodge(width = 1))+geom_errorbarh(height=0.1, position = position_dodge(width = 1))+scale_y_discrete(name='Model', limits=rev(levels(main_predictor_global$modeltype)))+facet_grid(childteen~outcome, scales='free_x', labeller = labeller(outcome=label_wrap_gen(20), childteen=visit.labs))+geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+theme(legend.position = 'bottom')+theme(text = element_text(size=16))+scale_color_discrete('', labels=c('Age 9', 'Age 15'))+theme_classic()+scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')
+
+g2<-ggplot(main_predictor_global%>%filter(outcome %in% levels(main_predictor_global$outcome)[4:6]), aes(x=estimate, xmin=conf.low, xmax=conf.high, color=childteen, y=modeltype))+geom_point(position = position_dodge(width = 1))+geom_errorbarh(height=0.1, position = position_dodge(width = 1))+scale_y_discrete(name='Model', limits=rev(levels(main_predictor_global$modeltype)))+facet_grid(childteen~outcome, labeller = labeller(outcome=label_wrap_gen(20), childteen=visit.labs))+geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+theme(legend.position = 'bottom')+theme(text = element_text(size=16))+scale_color_discrete('', labels=c('Age 9', 'Age 15'))+theme_classic()+scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')
+
+plot_grid(g1, g2, nrow=2, labels = c("A", "B"))
+
+example_coef<-main_predictor_global%>%filter(outcome %in% levels(main_predictor_global$outcome)[4] & modeltype=='Secondhand smoking exposure model' & childteen=='C')
+```
+
+```{r save forest global}
+
+png(file.path(outputdir, 'GlobalForest.png'), width=1300, height=550)
+plot_grid(g1+theme(text=element_text(size=16)), g2+theme(text=element_text(size=16)), nrow=2, labels = c("A", "B"))
+dev.off()
+
+png(file.path(outputdir, 'GlobalForestA.png'), width=1300, height=550)
+g1+theme(text=element_text(size=16))
+dev.off()
+
+png(file.path(outputdir, 'GlobalForestB.png'), width=1300, height=550)
+g2+theme(text=element_text(size=16))
+dev.off()
+
+
+```
+### Check sample plate terms
+
+```{r check sample plate coefficients}
+#check how many models have at least one plate associated  
+(n_samplePlateAs=global_models %>% filter(str_detect(term, 'Sample_Plate') & p.value<0.05)%>%dplyr::select(modeltype, childteen, outcome)%>%unique()%>%nrow())
+# is this the same as the number of models run?
+n_samplePlateAs==global_models %>% dplyr::select(modeltype, childteen, outcome)%>%unique()%>%nrow()
+
+#Are certain plates responsible or is it widespread?
+#in how many models is each plate associated 
+global_models %>% filter(str_detect(term, 'Sample_Plate') & p.value<0.05)%>%dplyr::select(term)%>%group_by(term)%>%summarise(n=n())%>%arrange(-n)
+# how many outcomes is each plate associated with? 
+global_models %>% filter(str_detect(term, 'Sample_Plate') & p.value<0.05)%>%dplyr::select(term, outcome)%>%unique()%>%group_by(term)%>%summarise(n=n())%>%arrange(-n)
+#for each outcome, how many plates are associated? 
+global_models %>% filter(str_detect(term, 'Sample_Plate') & p.value<0.05)%>%dplyr::select(term, outcome, childteen, modeltype)%>%group_by(outcome, childteen, modeltype)%>%summarise(n=n(), plates=toString(term))%>%arrange(-n)%>%kable()%>%scroll_box(width='100%', height='400px')
+```
+
+Every single model has at least 1 plate that is significantly associated with the outcome methylation metric. Models with global methylation have the most plates associated with them. Sample plate 4, 12, 15 and 3 have the most associations with methylation outcomes, this does not exactly match what Jonah reports from his email (PC2 & PC6 correlate with batch, PC2 --> Plate 9 & 10, PC6--> Plate 12). 
+
+### Interpertation 
+
+Prenatal maternal smoking has a DNA methylation signature that is identifiable in saliva samples from children aged 9 and aged 15. This signature is specific, that is, there is no effect of prenatal maternal smoking on either global methylation or DNA methylation clocks estimated from CpG site methylation data from saliva samples of children aged 9 or 15. However,there is an effect of prenatal maternal smoking on polymethylation scores constructed using weights from a consortium-based meta-analysis of prenatal maternal smoking and blood methylation. 
+
+For example, among children aged 9 years old, children whose mother smoked during pregnancy had an 'Any smoking polymethylation score' that was on average `r example_coef%>%pull(estimate)%>%round(2)` (95% CI: (`r example_coef%>%pull(conf.low)%>%round(2)`, `r example_coef%>%pull(conf.high)%>%round(2)`))
+
+Another thing to note is that the confidence intervals for the effect of prenatal maternal smoking overlap in the 9-year and 15-year visit: that is, it appears that the effect of prenatal maternal smoking is similar at both ages. 
+
+### IGES abstract
+
+```{r code for IGES abstract}
+# # in modeldata
+n_tot<-modeldata$id%>%unique()%>%length()
+# # smoke exposed
+modeldata %>% dplyr::select(id, smkPreg_binary)%>%unique()%>%group_by(smkPreg_binary)%>%summarise(n=n())
+modeldata %>% dplyr::select(id, ancestry)%>%unique()%>%group_by(ancestry)%>%summarise(n=n(), percent=n/n_tot)
+#correlation between polymethylation score (newborn, ct controlled)
+modeldata %>% dplyr::select(id, SSnewbornCT_center, childteen)%>%pivot_wider(id_cols=id, names_from=childteen, values_from=SSnewbornCT_center)%>%ggplot(aes(x=C, y=T))+geom_point()+stat_cor()
+
+df<-modeldata %>% dplyr::select(id, SSnewbornCT_center, childteen)%>%pivot_wider(id_cols=id, names_from=childteen, values_from=SSnewbornCT_center)
+
+#abstract model (global, CT-controlled newborn, w/ plate variable)
+age9Coef<-main_predictor_global%>%filter(outcome %in% levels(main_predictor_global$outcome)[5] & modeltype=='Secondhand smoking exposure model' & childteen=='C')
+print(paste0(round(age9Coef$estimate, 2), ', (', round(age9Coef$conf.low, 2), ', ', round(age9Coef$conf.high, 2), ')'))
+
+age15Coef<-main_predictor_global%>%filter(outcome %in% levels(main_predictor_global$outcome)[5] & modeltype=='Secondhand smoking exposure model' & childteen=='T')
+print(paste0(round(age15Coef$estimate, 2), ', (', round(age15Coef$conf.low, 2), ', ', round(age15Coef$conf.high, 2), ')'))
+
+```
+
+### Global models with slide as a variable 
+Just checking if controlling for slide number influences models
+Took out 05/05/21 because added plate variable to main models (check with kelly) 
+```{r global models forest plot with slide as variable, fig.width=11, fig.height=10, eval=F}
+main_predictor_global<-global_models_withslides %>% filter(term=='smkPreg_binaryYes')%>%mutate(modeltype=factor(modeltype, levels=c("Base model", "Prenatal exposures model", "Secondhand smoking exposure model")))
+
+visit.labs=c('Age 9', 'Age 15'); names(visit.labs)=c('C', 'T')
+
+g1<-ggplot(main_predictor_global%>%filter(outcome %in% levels(main_predictor_global$outcome)[1:3]), aes(x=estimate, xmin=conf.low, xmax=conf.high, color=childteen, y=modeltype))+geom_point(position = position_dodge(width = 1))+geom_errorbarh(height=0.1, position = position_dodge(width = 1))+scale_y_discrete(name='Model', limits=rev(levels(main_predictor_global$modeltype)))+facet_grid(childteen~outcome, scales='free_x', labeller = labeller(outcome=label_wrap_gen(20), childteen=visit.labs))+geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+theme(legend.position = 'bottom')+theme(text = element_text(size=16))+scale_color_discrete('', labels=c('Age 9', 'Age 15'))+theme_classic()+scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')
+
+g2<-ggplot(main_predictor_global%>%filter(outcome %in% levels(main_predictor_global$outcome)[4:6]), aes(x=estimate, xmin=conf.low, xmax=conf.high, color=childteen, y=modeltype))+geom_point(position = position_dodge(width = 1))+geom_errorbarh(height=0.1, position = position_dodge(width = 1))+scale_y_discrete(name='Model', limits=rev(levels(main_predictor_global$modeltype)))+facet_grid(childteen~outcome, labeller = labeller(outcome=label_wrap_gen(20), childteen=visit.labs))+geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+theme(legend.position = 'bottom')+theme(text = element_text(size=16))+scale_color_discrete('', labels=c('Age 9', 'Age 15'))+theme_classic()+scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')
+
+plot_grid(g1, g2, nrow=2, labels = c("A", "B"))
+```
+
+## Ancestry-specific models 
+
+The same three models and siix outcomes, EXCEPT that in each model type we replace the global PCs of ancestry with PCs of ancestry from PCA run within each ancestry strata, i.e. local PCs: 
+
+* Base model variables: Yes/No smoking during pregnancy, 1st and 2nd principal components of ancestry from a PCA run **only on children of the same ancestry**, child sex, maternal income to poverty ratio at birth, child age at interview, epithelial cells, immune cells
+
+
+```{r loop ancestry stratified crosssectional, results='hide'}
+#listOfData<-list("Base model"=basemodeldata, "Prenatal exposures model"=prenatalexdata, "Secondhand smoking exposure model"=secondhandsmkdata, "Firsthand smoking exposure model"=rbind(child_nosmoke, teen_nosmoke))
+listOfData<-list("Base model"=modeldata, "Prenatal exposures model"=modeldata, "Secondhand smoking exposure model"=modeldata)
+listOfNests<-list()
+#######################
+prenatalModelvars<-paste0(baseModelvars_local, '+m1g2_YesNoPreg+m1g3_YesNoPreg')
+smokeModelvars<-paste0(prenatalModelvars, '+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth')
+predictors=predictors<-c('basemodel'=baseModelvars_local, 'prenatalex'=prenatalModelvars, 'secondhand'=smokeModelvars)
+
+####################################
+for(i in 1:length(predictors)){
+  listOfNests[[i]]<-listOfData[[i]]%>%group_by(childteen, ancestry)%>%nest()
+  listOfNests[[i]]<-left_join(args, listOfNests[[i]], by='childteen')
+  listOfNests[[i]]<-listOfNests[[i]] %>% mutate(model=map2(data, outcome, model, x=predictors[i]), 
+                                                tidied = map(model, tidy, conf.int=T), glanced = map(model, glance), 
+                                                augmented=map(model, augment))%>%
+                                        unnest(tidied)%>%unnest(glanced, names_sep='_')
+}
+names(listOfNests)<-names(listOfData)
+ancestry_models<-listOfNests %>%bind_rows(.id='modeltype')%>%dplyr::select(-data, -model, -augmented)%>%mutate(outcome=factor(outcome, levels=c("globalmethylation",  "pediatric", "grim", "anynewborn_center", "SSnewbornCT_center", "SSolder_center"), labels=c('Global methylation', 'Pediatric clock', 'GRIM clock','Any smoking polymethylation score (newborns)', 'Sustained smoking polymethylation score (newborns, cell-type controlled', 'Sustained smoking polymethylation score (older children)')))
+```
+
+
+### Ancestry-specific model fit tables
+```{r model fit tables ancestry specific}
+ancestry.mf<-ancestry_models %>% filter(term=='(Intercept)') %>% dplyr::select(outcome, ancestry, modeltype, childteen,glanced_nobs, glanced_adj.r.squared, glanced_AIC, glanced_logLik, glanced_p.value)%>%arrange(ancestry,outcome)%>%mutate(glanced_p.value=as.character(signif(glanced_p.value, 2))) %>%pivot_wider(id_cols = c("outcome", "ancestry", "modeltype"), names_from = childteen, names_glue="{childteen}_{.value}", values_from = c(glanced_nobs, glanced_adj.r.squared, glanced_AIC, glanced_logLik, glanced_p.value))%>%dplyr::select(ancestry, outcome, modeltype, order(colnames(.)))
+
+african.mf<-ancestry.mf %>%filter(ancestry=="African ancestry")%>% setNames(sub("^[^_]*_([^_]*)*_([^_]*).*", "\\2", colnames(ancestry.mf)))
+european.mf<-ancestry.mf %>%filter(ancestry=="European ancestry")%>% setNames(sub("^[^_]*_([^_]*)*_([^_]*).*", "\\2", colnames(ancestry.mf)))
+hispanic.mf<-ancestry.mf %>%filter(ancestry=="Hispanic ancestry")%>% setNames(sub("^[^_]*_([^_]*)*_([^_]*).*", "\\2", colnames(ancestry.mf)))
+```
+
+African ancestry model fit
+```{r african ancestry}
+kable(african.mf, digits=2)%>%kable_classic()%>%add_header_above(c(" "=3, "Age 9 models"=5, "Age 15 models"=5))%>%kable_styling(font_size=10)%>%pack_rows("Global methylation model", 1, 3)%>%pack_rows("Epigenetic clocks", 4, 9)%>%pack_rows("Polymethylation scores", 10, 18)%>%scroll_box(width='100%', height='400px')
+```
+
+European ancestry model fit
+```{r eurpoean ancestry}
+kable(european.mf, digits=2)%>%kable_classic()%>%add_header_above(c(" "=3, "Age 9 models"=5, "Age 15 models"=5))%>%kable_styling(font_size=10)%>%pack_rows("Global methylation model", 1, 3)%>%pack_rows("Epigenetic clocks", 4, 9)%>%pack_rows("Polymethylation scores", 10, 18)%>%scroll_box(width='100%', height='400px')
+```
+
+Hispanic ancestry model fit
+```{r hispanic ancestry}
+kable(hispanic.mf, digits=2)%>%kable_classic()%>%add_header_above(c(" "=3, "Age 9 models"=5, "Age 15 models"=5))%>%kable_styling(font_size=10)%>%pack_rows("Global methylation model", 1, 3)%>%pack_rows("Epigenetic clocks", 4, 9)%>%pack_rows("Polymethylation scores", 10, 18)%>%scroll_box(width='100%', height='400px')
+```
+
+### Ancestry specific forest plots for prenatal maternal smoking 
+```{r ancestry specific forestplots, fig.width=11, fig.height=10}
+main_predictor<-ancestry_models%>%filter(term=="smkPreg_binaryYes")%>%mutate(modeltype=factor(modeltype, levels=c("Base model", "Prenatal exposures model", "Secondhand smoking exposure model")))%>%mutate(R2=paste0('adjR^2==', round(glanced_adj.r.squared,2)))
+
+ggplot(main_predictor %>% filter(outcome %in% c("Pediatric clock", "Levine clock")), aes(x=estimate, xmin=conf.low, xmax=conf.high, color=childteen, y=modeltype))+geom_point(position = position_dodge(width = 1))+geom_errorbarh(height=0.1, position = position_dodge(width = 1))+scale_x_continuous()+scale_y_discrete(name='Model', limits=rev(levels(main_predictor$modeltype)))+facet_grid(outcome~ancestry, labeller = labeller(outcome=label_wrap_gen(20), childteen=visit.labs))+geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+geom_text(aes(x=conf.high+1,label=paste0("n=", glanced_nobs)), position=position_dodge(width = 1))+theme(text = element_text(size=16))+theme(legend.position = 'bottom')+theme(text = element_text(size=16))+scale_color_discrete('', labels=c('Age 9', 'Age 15'))+theme_classic()+scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')
+
+ggplot(main_predictor %>% filter(outcome %in% c("Global methylation")), aes(x=estimate, xmin=conf.low, xmax=conf.high, color=childteen, y=modeltype))+geom_point(position = position_dodge(width = 1))+geom_errorbarh(height=0.1, position = position_dodge(width = 1))+scale_x_continuous()+scale_y_discrete(name='Model', limits=rev(levels(main_predictor$modeltype)))+facet_grid(outcome~ancestry, labeller = labeller(outcome=label_wrap_gen(20), childteen=visit.labs))+geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+geom_text(aes(x=conf.high+0.005,label=paste0("n=", glanced_nobs)), position=position_dodge(width = 1))+xlim(-0.015, 0.015)+theme(legend.position = 'bottom')+theme(text = element_text(size=16))+scale_color_discrete('', labels=c('Age 9', 'Age 15'))+theme_classic()+scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')
+
+ggplot(main_predictor %>% filter(outcome %in% levels(main_predictor$outcome)[4:6]), aes(x=estimate, xmin=conf.low, xmax=conf.high, color=childteen, y=modeltype))+geom_point(position = position_dodge(width = 1))+geom_errorbarh(height=0.1, position = position_dodge(width = 1))+scale_x_continuous()+scale_y_discrete(name='Model', limits=rev(levels(main_predictor$modeltype)))+facet_grid(outcome~ancestry, labeller = labeller(outcome=label_wrap_gen(20), childteen=visit.labs))+geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+geom_text(aes(x=conf.high+0.05,label=paste0("n=", glanced_nobs)), position=position_dodge(width = 1))+theme(legend.position = 'bottom')+theme(text = element_text(size=16))+scale_color_discrete('', labels=c('Age 9', 'Age 15'))+theme_classic()+scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')
+
+```
+
+```{r save forest ancestry}
+
+png(file.path(outputdir, 'AncestryForest.png'), width=1300, height=700)
+ggplot(main_predictor %>% filter(outcome %in% levels(main_predictor$outcome)[4:6]), aes(x=estimate, xmin=conf.low, xmax=conf.high, color=childteen, y=modeltype))+geom_point(position = position_dodge(width = 1))+geom_errorbarh(height=0.1, position = position_dodge(width = 1))+scale_x_continuous()+scale_y_discrete(name='Model', limits=rev(levels(main_predictor$modeltype)))+facet_grid(ancestry~outcome, labeller = labeller(outcome=label_wrap_gen(20), childteen=visit.labs))+geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+geom_text(aes(x=conf.high+0.05,label=paste0("n=", glanced_nobs)), position=position_dodge(width = 1))+theme(legend.position = 'bottom')+theme(text = element_text(size=16))+scale_color_discrete('', labels=c('Age 9', 'Age 15'))+theme_classic()+scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')+theme(text=element_text(size=16))
+dev.off()
+
+
+
+```
+
+Very similar effect sizes across ancestry groups, although error bars cross 0 for the Hispanic and European strata models (recall, the number of women who smoked during pregnancy in these strata is very small). 
+
+Possibly something different going on with the European teens in the secondhand smoking exposure model. Interestingly, the European mom's have the heaviest distribution of postnatal smoking, with a larger percentage reporting over a pack a day.  
+
+
+# Longitudinal multivariate models on summary methylation variables
+
+## Background & theory  
+So far we have been ignoring the longitudinal nature of our data, and treating it as two cross-sectional samples: however, most children had methylation data measured at 2 time points, age 9 and 15.  In our data we have the following structure, where $i$ is visit such that $i \in {Age9, Age15}$ and $j$ is child
+
+* $Y_{ij}$ is one of several epigenome summary metrics, which are all measured for each $j$ child at each $i$ visit
+
+* $X_j$ is the binary yes/no maternal prenatal smoking variable, which was measured once for each $j$ child
+
+* $A_j ... F_j$ are time-invariant confounders measured once for each $j$ child, such as: 
+
+  + Ancestry: First 2 local or global PC measurements from genetic data 
+  + Child sex
+  + Maternal income to poverty ratio at birth 
+  + Maternal alcohol or other drug use during pregnancy 
+  
+* $G_{ij} ... N_{ij}$ are time-variant confounders measured at each visit $i$ for each $j$ child, such as:
+
+  + Child age at visit $i$
+  + Epithelial/immune cell in sample from visit $i$
+  + Yes/no postnatal maternal smoking at at maternal interview corresponding to visit $i$
+  + Postnatal maternal smoking in packs/day in month prior to maternal interview corresponding to visit $i$ 
+
+
+There are two (common) ways to model longitduinal data like this: 
+
+* LMM are conditional models, that is, estimates are subject-specific and allow for variation in subjects (which are modeled through random intercepts/slopes)-->What is the individual specific effect of the covariate? 
+
+The LMM base model for our data would be something like: 
+
+$Y_{ij} = \beta_0 + \beta_1 PrenatalSmoking_j+\beta_2 PC1_j +\beta_3 PC2_j +$
+$\beta_4 ChildSex_j+\beta_5MaternalIncome_j+\beta_6ChildAge_{ij}+\beta_7EpiCells_{ij}+$
+$\beta_8ImmuneCells_{ij} +\beta_9PrenatalSmoking_j*ChildAge_{ij}+b_{0i}+\epsilon_{ij}$
+
+Where $i$ indexes visits within subject (child) $j$ and $j$ is the individual subject (child), the $\beta$'s are the fixed effects, $b_{0j}$ is the random deviation in intercept for subject $j$, and the errors $\epsilon_{ij}$ are conditional errors and represent the deviation from the fixed effects plus random effects at time $i$ for subject $j$ (conditional errors are independent, and correlation is a result of the random effects in the model). The interaction between Age and Prenatal Maternal smoking allows us to investigate if the rate of change in the epigenome summary variable (outcome) differs for those exposed vs unexposed to prenatal maternal smoking. 
+
+
+* GEE are marginal models, that is, estimates are population averages and you are modeling the expectation of your outcome conditional only upon the fixed design matrix --> What is the population averaged effect of the covariate?
+
+The GEE base model for our data would be something like: 
+
+$Y_{ij} = \beta_0 + \beta_1 PrenatalSmoking_j+\beta_2 PC1_j +\beta_3 PC2_j +$
+$\beta_4 ChildSex_j+\beta_5MaternalIncome_j+\beta_6ChildAge_{ij}+\beta_7EpiCells_{ij}+$
+$\beta_8ImmuneCells_{ij}+\beta_9PrenatalSmoking_j*ChildAge_{ij}+\epsilon_{ij}$
+
+Again, $i$ indexes visits within subject (child) $j$ and $j$ is the individual subject (child), and the $\beta$'s are the fixed effects. However, the marginal model does not have any random effects (intercepts or slopes), except the random errors. The errors represent the deviation from the fixed effects for each subject at each time point and these errors are not conditional on random effects and are instead are marginal errors, which we assume are correlated within a subject $j$. 
+
+Unlike LMM, GEE does not make distributional assumptions for the observations and the random effects. Additionally the robust sandwich type standard errors from a GEE will be valid asymptotic condifence intervals even if the correlation structure specified is not correct. 
+
+LMM may be preferred over GEE when: 
+  + Subjects measured at many different arbitrary time points --> not true for FF
+  + Interested in modeling growth trajectories for different subjects --> true for FF
+
+GEE will work best when: 
+  + Number of observation per subeject is small and number of subjects large --> true for FF
+  + Measurements taken at the same time for all subjects --> true for FF
+  
+A GEE model with compound symmetry/exchangeable covariance structure will be the same as an LMM with a random intercept when using the identity link (when in a linear model framework) - since the MOST time points we have for any child is 2, every type of co-variance structure is actually the same and they are therefore all symmetric. 
+
+
+## Bivariate analyses: Spaghetti plots 
+
+
+```{r mah spahghetti global, figure.width=10}
+p<-ggplot(modeldata, aes(x=ChildAgeComposite, y=globalmethylation, group=id, color=smkPreg_binary))+geom_line(alpha=0.05)+geom_smooth(aes(group=smkPreg_binary), method='lm')+scale_x_continuous('Child age (months)')+scale_y_continuous('Score')+ggtitle('Global methylation')+scale_color_discrete('Prenatal maternal smoking')+theme_classic()
+plot_grid(p, p+facet_wrap(~ancestry), ncol=1)
+```
+
+```{r mah spahghetti pediatric, figure.width=10}
+p<-ggplot(modeldata, aes(x=ChildAgeComposite, y=pediatric, group=id, color=smkPreg_binary))+geom_line(alpha=0.05)+geom_smooth(aes(group=smkPreg_binary), method='lm')+scale_x_continuous('Child age (months)')+scale_y_continuous('Score')+ggtitle('Pediatric clock')+scale_color_discrete('Prenatal maternal smoking')+theme_classic()
+plot_grid(p, p+facet_wrap(~ancestry), ncol=1)
+```
+
+```{r mah spahghetti SSnewbornCT score, figure.width=10}
+
+p<-ggplot(modeldata, aes(x=ChildAgeComposite, y=SSnewbornCT_center, group=id, color=smkPreg_binary))+geom_line(alpha=0.05)+geom_smooth(aes(group=smkPreg_binary), method='lm')+scale_x_continuous('Child age (months)')+scale_y_continuous('Score')+ggtitle('Sustained smoking \n newborn, cell-type controlled')+scale_color_discrete('Prenatal maternal smoking')+theme_classic()
+plot_grid(p, p+facet_wrap(~ancestry), ncol=1)
+```
+
+After looking at the spaghetti plots, I think it would also be reasonable to be interested in a random slope for age/time, i.e. $b_{1j}ChildAge_{ij}$ where $b_{1j}$ is the random deviation in slope (of $Y_j$ over $i$). However, we don't have enough observations to support this, when I include a random intercept and a random slope, I get an error message that the number of observations <= number of random effects (see: https://stats.stackexchange.com/questions/193678/number-of-random-effects-is-not-correct-in-lmer-model)
+
+
+## Global longitudinal models (LMM)
+
+```{r Define variables for models longitudinal}
+y_vector<-c("globalmethylation", "pediatric", "grim", "anynewborn_center", "SSnewbornCT_center", "SSolder_center")
+###########################
+baseModelvars_local<-"~smkPreg_binary+local_PC1+local_PC2+cm1bsex+cm1inpov+ChildAgeComposite+Epi+IC+Sample_Plate"
+baseModelvars_global<-"~smkPreg_binary+global_PC1+global_PC2+cm1bsex+cm1inpov+ChildAgeComposite+Epi+IC+Sample_Plate"
+baseModelInt<-paste0(baseModelvars_global,'+smkPreg_binary*ChildAgeComposite')
+prenatalModelvars<-paste0(baseModelInt, '+m1g2_YesNoPreg+m1g3_YesNoPreg')
+smokeModelvars<-paste0(prenatalModelvars, '+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth')
+predictors<-c('basemodel'=baseModelvars_global, 'basemodelInt'=baseModelInt, 'prenatalex'=prenatalModelvars, 'secondhand'=smokeModelvars) 
+data2<-list('ancestry'=c('African ancestry', 'Hispanic ancestry', 'European ancestry'), 'outcome'=y_vector)
+args2<-data2 %>%cross_df()
+```
+
+```{r loop global lmm, warning=F}
+listOfModels<-list()
+listOfNests<-list()
+listOfData<-list("Base model"=modeldata, "Base model with time interaction"= modeldata, "Prenatal exposures model"=modeldata, "Secondhand smoking exposure model"=modeldata)
+for(i in 1:length(predictors)){
+  listOfModels[[i]]<-listOfData[[i]]%>%droplevels()%>%dplyr::summarise(model=map(y_vector, model_lmm, x=predictors[i], df=.), outcome=y_vector)
+  listOfNests[[i]]<-listOfModels[[i]]%>%mutate(tidied=map(model, tidy, conf.int=T), glanced=map(model, glance))%>%unnest(tidied)%>%unnest(glanced, names_sep='_')
+}
+
+
+names(listOfNests)<-names(listOfData)
+names(listOfModels)<-names(listOfData)  
+
+global_models_lmm<-listOfNests %>%bind_rows(.id='modeltype')%>%dplyr::select(-model)%>%mutate(outcome=factor(outcome, levels=c("globalmethylation",  "pediatric","grim", "anynewborn_center", "SSnewbornCT_center", "SSolder_center"), labels=c('Global methylation',  'Pediatric clock', 'GRIM clock','Any smoking polymethylation score (newborns)', 'Sustained smoking polymethylation score (newborns, cell-type controlled', 'Sutained smoking polymethylation score (older children)')))  
+
+global_models_lmm2<-listOfModels %>%bind_rows(.id='modeltype')
+global_models_lmm2 <-global_models_lmm2 %>%pivot_wider(id_cols=outcome, names_from=modeltype, values_from=model)%>% group_by(outcome)%>%mutate(aov_int=map2(`Base model`, `Base model with time interaction`, anova), aov_int_tidy=map(aov_int, tidy))
+```
+
+### Is there an effect of age? 
+
+Our expectation from the bivariate analyses from the previous markdown is that there is a significant effect of age for most methylation summary metrics, but that this effect is very small, except for the clocks, where the effect is larger. 
+
+```{r Child Age coefficient}
+global_models_lmm %>% filter(term=='ChildAgeComposite')%>%dplyr::select(modeltype, outcome, effect, term, estimate, std.error, statistic,  p.value, conf.low, conf.high)%>%arrange(outcome)%>%kable()%>%kable_classic()%>%kable_styling(font_size=10)%>%pack_rows("Global methylation model", 1, 4)%>%pack_rows("Epigenetic clocks", 5, 12)%>%pack_rows("Polymethylation scores", 13, 24)%>%scroll_box(width='100%', height='400px')
+```
+Yes, expectation fulfilled
+
+### Is there an effect of prenatal maternal smoking? 
+
+Our expectation from our bivariate analyses and our cross sectional models is that there will be an effect of prenatal maternal smoking for the polymethylation score variables but not for global methylation or the clocks
+
+```{r}
+global_models_lmm %>% filter(term=='smkPreg_binaryYes')%>%dplyr::select(modeltype, outcome, effect, term, estimate, std.error, statistic,  p.value, conf.low, conf.high)%>%arrange(outcome)%>%kable()%>%kable_classic()%>%kable_styling(font_size=10)%>%pack_rows("Global methylation model", 1, 4)%>%pack_rows("Epigenetic clocks", 5, 12)%>%pack_rows("Polymethylation scores", 13, 24)%>%scroll_box(width='100%', height='400px')
+```
+
+Expectation fulfilled
+
+### Does the age-effect vary by prenatal maternal sloping: Is the slope for age different depending on prenatal maternal smoking status?
+
+
+From our spaghetti plots, it didn't really look like there were different slopes for age depending on prenatal maternal smoking exposure, although the age slope is so small it is difficult to tell. For global methylation in Hispanic ancestry individuals looked the strongest. 
+
+```{r }
+global_models_lmm %>% filter(term=='smkPreg_binaryYes:ChildAgeComposite')%>%dplyr::select(modeltype, outcome, effect, term, estimate, std.error, statistic,  p.value, conf.low, conf.high)%>%arrange(outcome)%>%kable()%>%kable_classic()%>%kable_styling(font_size=10)%>%pack_rows("Global methylation model", 1, 3)%>%pack_rows("Epigenetic clocks", 4, 9)%>%pack_rows("Polymethylation scores", 10, 18)%>%scroll_box(width='100%', height='400px')
+```
+
+No, maybe could make an argument for global methylation model. 
+
+
+<details><summary>Click here</summary>
+
+Another way to see that would be using contrast statements: 
+
+```{r contrasts not stratified, eval=F}
+K1<-matrix(c(0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0), 1)
+#ageSlopeNoSmoke<-glht(model_4_g_int, linfct=K)
+K2<-matrix(c(0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1), 1)
+#ageSlopeYesSmoke<-glht(model_4_g_int, linfct=K2)
+
+contrast_ageslope<-global_models_lmm2 %>% mutate(AgeSlopeNoSmoke=map(.x=`Secondhand smoking exposure model`, .f=glht, linfct=K1), AgeSlopeSmoke=map(.x=`Secondhand smoking exposure model`, .f=glht, linfct=K2), AgeSlopeNoSmoke=map(AgeSlopeNoSmoke, confint), AgeSlopeSmoke=map(AgeSlopeSmoke, confint), AgeSlopeNoSmoke=map(AgeSlopeNoSmoke, tidy), AgeSlopeSmoke=map(AgeSlopeSmoke, tidy))%>%unnest(c(AgeSlopeNoSmoke), names_sep='_') %>% unnest(c(AgeSlopeSmoke), names_sep='_')%>%dplyr::select(outcome, AgeSlopeSmoke_estimate, AgeSlopeSmoke_conf.high, AgeSlopeSmoke_conf.low, AgeSlopeNoSmoke_estimate, AgeSlopeNoSmoke_conf.high, AgeSlopeNoSmoke_conf.low)%>%pivot_longer(2:7, names_to=c("type", ".value"), names_pattern="(.*)_(.*)")%>%mutate(outcometype=ifelse(str_detect(outcome, 'center'), 'Polymethylation score', ifelse(outcome=='globalmethylation', 'Global methylation', 'Methylation clock')))
+
+ggplot(contrast_ageslope %>% filter(outcometype=='Global methylation'), aes(y=outcome, x=estimate, xmin=conf.low, xmax=conf.high, color=type))+geom_point(position = position_dodge(width = 1))+geom_errorbarh(height=0.1, position = position_dodge(width = 1))+scale_x_continuous()+scale_y_discrete()+facet_grid(outcometype~., scales='free')+scale_y_discrete(labels=c('Global methylation'))+scale_x_continuous()+scale_color_discrete(name='Age slope:', labels=c('With no prenatal maternal smoking', 'With prenatal maternal smoking'))+theme_classic()+theme(legend.position='bottom')
+
+```
+
+<details><summary>Click here</summary>
+
+## Ancesty specific longitudinal models (LMM) 
+
+```{r loop ancestry stratified lmm, warning=F}
+baseModelvars_local<-"~smkPreg_binary+local_PC1+local_PC2+cm1bsex+cm1inpov+ChildAgeComposite+Epi+IC+Sample_Plate"
+baseModelvars_global<-"~smkPreg_binary+global_PC1+global_PC2+cm1bsex+cm1inpov+ChildAgeComposite+Epi+IC+Sample_Plate"
+baseModelInt<-paste0(baseModelvars_local,'+smkPreg_binary*ChildAgeComposite')
+prenatalModelvars<-paste0(baseModelInt, '+m1g2_YesNoPreg+m1g3_YesNoPreg')
+smokeModelvars<-paste0(prenatalModelvars, '+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth')
+predictors<-c('basemodel'=baseModelvars_global, 'basemodelInt'=baseModelInt, 'prenatalex'=prenatalModelvars, 'secondhand'=smokeModelvars) ##################################
+listOfNests<-list()
+for(i in 1:length(predictors)){
+  listOfNests[[i]]<-listOfData[[i]]%>%droplevels()%>%group_by(ancestry)%>%nest()
+  listOfNests[[i]]<-left_join(args2, listOfNests[[i]], by='ancestry')
+  listOfNests[[i]]<-listOfNests[[i]] %>% mutate(model=map2(data, outcome, model_lmm, x=predictors[i]), tidied = map(model, tidy, conf.int=T), glanced = map(model, glance))%>%
+                                        unnest(tidied)%>%unnest(glanced, names_sep='_')
+}
+names(listOfNests)<-names(listOfData)
+ancestry_models_lmm<-listOfNests %>%bind_rows(.id='modeltype')%>%dplyr::select(-data, -model)%>%mutate(outcome=factor(outcome, levels=c("globalmethylation", "levine", "pediatric", "anynewborn_center", "SSnewbornCT_center", "SSolder_center"), labels=c('Global methylation', 'Levine clock', 'Pediatric clock', 'Any smoking polymethylation score (newborns)', 'Sustained smoking polymethylation score (newborns, cell-type controlled', 'Sustained smoking polymethylation score (older children)')))
+ancestry_models_lmm2<-listOfNests %>%bind_rows(.id='modeltype')
+```
+
+```{r, eval=F}
+ancestry_models_lmm %>% filter(term=='smkPreg_binaryYes:ChildAgeComposite')%>%dplyr::select(modeltype, outcome, effect, term, estimate, std.error, statistic,  p.value, conf.low, conf.high)%>%arrange(outcome)%>%kable()%>%kable_classic()%>%kable_styling(font_size=10)%>%pack_rows("Global methylation model", 1, 3)%>%pack_rows("Epigenetic clocks", 4, 9)%>%pack_rows("Polymethylation scores", 10, 18)%>%scroll_box(width='100%', height='400px')
+```
+Our expectation is that there will be a significant effect in the African ancestry strata, and that the direction of effect will be fairly consistent in the other ancestry strata but the confidence intervals will be wider, reflecting the small sample size post-stratification. 
+
+```{r forest plots lmm ancestry specific, figure.width=10}
+main_predictor<-ancestry_models_lmm%>%filter(term=="smkPreg_binaryYes")%>%mutate(modeltype=factor(modeltype, levels=c("Base model", "Base model with time interaction", "Prenatal exposures model", "Secondhand smoking exposure model")))
+
+ggplot(main_predictor %>% filter(outcome %in% c("Pediatric clock", "Levine clock")), aes(x=estimate, xmin=conf.low, xmax=conf.high, y=modeltype))+geom_point(position = position_dodge(width = 1))+geom_errorbarh(height=0.1, position = position_dodge(width = 1))+scale_x_continuous()+scale_y_discrete(name='Model', limits=rev(levels(main_predictor$modeltype)))+facet_grid(outcome~ancestry, labeller = labeller(outcome=label_wrap_gen(20), childteen=visit.labs))+geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+theme(text = element_text(size=16))+theme(legend.position = 'bottom')+theme(text = element_text(size=16))+theme_classic()+scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')
+
+ggplot(main_predictor %>% filter(outcome %in% c("Global methylation")), aes(x=estimate, xmin=conf.low, xmax=conf.high, y=modeltype))+geom_point(position = position_dodge(width = 1))+geom_errorbarh(height=0.1, position = position_dodge(width = 1))+scale_x_continuous()+scale_y_discrete(name='Model', limits=rev(levels(main_predictor$modeltype)))+facet_grid(outcome~ancestry, labeller = labeller(outcome=label_wrap_gen(20), childteen=visit.labs))+geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+xlim(-0.015, 0.015)+theme(legend.position = 'bottom')+theme(text = element_text(size=16))+theme_classic()+scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')
+
+ggplot(main_predictor %>% filter(outcome %in% levels(main_predictor$outcome)[4:6]), aes(x=estimate, xmin=conf.low, xmax=conf.high,  y=modeltype))+geom_point(position = position_dodge(width = 1))+geom_errorbarh(height=0.1, position = position_dodge(width = 1))+scale_x_continuous()+scale_y_discrete(name='Model', limits=rev(levels(main_predictor$modeltype)))+facet_grid(outcome~ancestry, labeller = labeller(outcome=label_wrap_gen(20), childteen=visit.labs))+geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+theme(legend.position = 'bottom')+theme(text = element_text(size=16))+theme_classic()+scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')
+
+```
+
+### Contrasts in age stratified models 
+
+Let's take a closer look at the idea of different age slopes by prenatal smoking exposure in the stratified models. One way to look at this is to calculate the $\beta_{Age}$ separately in children exposed vs unexposed to prenatal maternal smoking using contrasts. Since I included an interaction in this model, we can calculate $\beta_{Age|Smoking}=\beta_{Age}+\beta_{Age*Smoke}*1$, and ditto for $\beta_{Age|NotSmoking}=\beta_{Age}+\beta_{Age*Smoke}*0=\beta_{Age}$, and then compare the two.
+
+Age slope by prenatal maternal smoking status: 
+
+```{r contrasts age slope stratified, eval=F}
+K1<-matrix(c(0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0), 1)
+#ageSlopeNoSmoke<-glht(model_4_g_int, linfct=K)
+K2<-matrix(c(0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1), 1)
+#ageSlopeYesSmoke<-glht(model_4_g_int, linfct=K2)
+
+contrast_ageslope<-ancestry_models_lmm2 %>% dplyr::filter(modeltype=='Secondhand smoking exposure model' & term=='smkPreg_binaryYes')%>% mutate(AgeSlopeNoSmoke=map(.x=model, .f=glht, linfct=K1), AgeSlopeSmoke=map(.x=model, .f=glht, linfct=K2), AgeSlopeNoSmoke=map(AgeSlopeNoSmoke, confint), AgeSlopeSmoke=map(AgeSlopeSmoke, confint), AgeSlopeNoSmoke=map(AgeSlopeNoSmoke, tidy), AgeSlopeSmoke=map(AgeSlopeSmoke, tidy))%>%unnest(c(AgeSlopeNoSmoke), names_sep='_') %>% unnest(c(AgeSlopeSmoke), names_sep='_')%>%dplyr::select(outcome, ancestry, AgeSlopeSmoke_estimate, AgeSlopeSmoke_conf.high, AgeSlopeSmoke_conf.low, AgeSlopeNoSmoke_estimate, AgeSlopeNoSmoke_conf.high, AgeSlopeNoSmoke_conf.low)%>%pivot_longer(3:8, names_to=c("type", ".value"), names_pattern="(.*)_(.*)")%>%mutate(outcometype=ifelse(str_detect(outcome, 'center'), 'Polymethylation score', ifelse(outcome=='globalmethylation', 'Global methylation', 'Methylation clock')))
+
+#ggplot(contrast_ageslope%>%filter(outcometype=='Global methylation'), aes(y=outcome, x=estimate, xmin=conf.low, xmax=conf.high, color=type))+geom_point(position = position_dodge(width = 1))+geom_errorbarh(height=0.1, position = position_dodge(width = 1))+scale_x_continuous()+scale_y_discrete()+facet_grid(outcometype~ancestry, scales='free')+scale_y_discrete()+scale_x_continuous()+scale_color_discrete(name='Age slope:', labels=c('With no prenatal maternal smoking', 'With prenatal maternal smoking'))+theme_classic()+theme(legend.position='bottom')+geom_vline(xintercept=0, color='red', linetype='dashed')
+
+
+ggplot(contrast_ageslope%>%filter(outcometype=='Polymethylation score'), aes(y=outcome, x=estimate, xmin=conf.low, xmax=conf.high, color=type))+geom_point(position = position_dodge(width = 1))+geom_errorbarh(height=0.1, position = position_dodge(width = 1))+scale_x_continuous()+scale_y_discrete()+facet_grid(outcometype~ancestry, scales='free')+scale_y_discrete(labels=c('Sustained smoking score - older', 'Sustained smoking - newborn +CT', 'Sustained smoking any - newborn'))+scale_x_continuous()+scale_color_discrete(name='Age slope:', labels=c('With no prenatal maternal smoking', 'With prenatal maternal smoking'))+theme_classic()+theme(legend.position='bottom')+geom_vline(xintercept=0, color='red', linetype='dashed')
+
+
+
+```
+A good check is that our confidence intervals for the age slope are clearly wider for those with prenatal maternal smoking, which makes sense as there are less women who smoked prenatally than did not. Although these estimates are not exactly the same, we can see that the confidence limits overlap so we are insufficiently powered to detect true differences. 
+
+
+```{r contrasts prenatal smoking slope stratified, results=F, eval=F}
+K1<-matrix(c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9), 1)
+#ageSlopeNoSmoke<-glht(model_4_g_int, linfct=K)
+K2<-matrix(c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15), 1)
+#ageSlopeYesSmoke<-glht(model_4_g_int, linfct=K2)
+
+contrast_ageslope<-ancestry_models_lmm2 %>% dplyr::filter(modeltype=='Secondhand smoking exposure model' & term=='smkPreg_binaryYes')%>% mutate(AgeSlopeNoSmoke=map(.x=model, .f=glht, linfct=K1), AgeSlopeSmoke=map(.x=model, .f=glht, linfct=K2), AgeSlopeNoSmoke=map(AgeSlopeNoSmoke, confint), AgeSlopeSmoke=map(AgeSlopeSmoke, confint), AgeSlopeNoSmoke=map(AgeSlopeNoSmoke, tidy), AgeSlopeSmoke=map(AgeSlopeSmoke, tidy))%>%unnest(c(AgeSlopeNoSmoke), names_sep='_') %>% unnest(c(AgeSlopeSmoke), names_sep='_')%>%dplyr::select(outcome, ancestry, AgeSlopeSmoke_estimate, AgeSlopeSmoke_conf.high, AgeSlopeSmoke_conf.low, AgeSlopeNoSmoke_estimate, AgeSlopeNoSmoke_conf.high, AgeSlopeNoSmoke_conf.low)%>%pivot_longer(3:8, names_to=c("type", ".value"), names_pattern="(.*)_(.*)")%>%mutate(outcometype=ifelse(str_detect(outcome, 'center'), 'Polymethylation score', ifelse(outcome=='globalmethylation', 'Global methylation', 'Methylation clock')))
+
+ggplot(contrast_ageslope%>%filter(outcometype=='Polymethylation score'), aes(y=outcome, x=estimate, xmin=conf.low, xmax=conf.high, color=type))+geom_point(position = position_dodge(width = 1))+geom_errorbarh(height=0.1, position = position_dodge(width = 1))+scale_x_continuous()+scale_y_discrete()+facet_grid(outcometype~ancestry, scales='free')+scale_y_discrete(labels=c('Sustained smoking score - older', 'Sustained smoking - newborn +CT', 'Sustained smoking any - newborn'))+scale_x_continuous()+scale_color_discrete(name='Age slope:')+theme_classic()+theme(legend.position='bottom')
+
+
+```
+
+## Walking through LMM & GEE comparison with a single outcome: SSolder_center polymethylation score (with interpretations)
+
+```{r LMM example, eval=F}
+
+#random intercept only models
+intercept_only1<-lmer(formula = SSolder_center~1+(1|id), data=modeldata, REML=F)#random intercept for subject
+model1<-lmer(formula = SSolder_center~smkPreg_binary+ChildAgeComposite+(1|id), data=modeldata, REML=F)
+model2<-lmer(formula = SSolder_center~smkPreg_binary+global_PC1+global_PC2+cm1bsex+cm1inpov+ChildAgeComposite+Epi+IC+(1|id), data=modeldata, REML=F)
+anova(model1, model2)
+model3<-lmer(formula = SSolder_center~smkPreg_binary+global_PC1+global_PC2+cm1bsex+cm1inpov+ChildAgeComposite+Epi+IC+smkPreg_binary*ChildAgeComposite+(1|id), data=modeldata, REML=F)
+anova(model2, model3)
+model4<-lmer(formula = SSolder_center~smkPreg_binary+global_PC1+global_PC2+cm1bsex+cm1inpov+ChildAgeComposite+Epi+IC+m1g2_YesNoPreg+m1g3_YesNoPreg+(1|id), data=modeldata, REML=F)
+anova(model3, model4)
+model5<-lmer(formula = SSolder_center~smkPreg_binary+global_PC1+global_PC2+cm1bsex+cm1inpov+ChildAgeComposite+Epi+IC+m1g2_YesNoPreg+m1g3_YesNoPreg+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth+(1|id), data=modeldata, REML=F)
+anova(model4, model5)
+model5_int<-lmer(formula = SSolder_center~smkPreg_binary*ChildAgeComposite+global_PC1+global_PC2+cm1bsex+cm1inpov+Epi+IC+m1g2_YesNoPreg+m1g3_YesNoPreg+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth+(1|id), data=modeldata, REML=F)
+anova(model5, model5_int)
+
+#proving to myself the interpretation of age slope is what I think it is 
+intercept_only1<-lmer(formula = SSolder_center~1+(1|id), data=modeldata%>%filter(ancestry=='Hispanic ancestry'), REML=F)#random intercept for subject
+model1<-lmer(formula = SSolder_center~smkPreg_binary+ChildAgeComposite+(1|id), data=modeldata%>%filter(ancestry=='Hispanic ancestry'), REML=F)
+model2<-lmer(formula = SSolder_center~smkPreg_binary*ChildAgeComposite+(1|id), data=modeldata%>%filter(ancestry=='Hispanic ancestry'), REML=F)
+
+#
+
+```
+
+```{r walk through GEE model}
+modeldata2<-modeldata[order(modeldata$id),]%>%mutate(id=as.factor(id))%>%droplevels()
+
+model1_g<-geeglm(SSolder_center~ChildAgeComposite+smkPreg_binary, data=modeldata2, family=gaussian(link='identity'), id=id, corstr = 'exchangeable')
+
+model2_g<-geeglm(SSolder_center~ChildAgeComposite+smkPreg_binary, data=modeldata2, family=gaussian(link='identity'), id=id, corstr = 'independence')
+#expectation that model 1 and model 2 are identical 
+anova(model1_g, model2_g)#expectation fulfilled 
+
+model2_g<-geeglm(SSolder_center~ChildAgeComposite+smkPreg_binary+global_PC1+global_PC2+cm1bsex+cm1inpov+ChildAgeComposite+Epi+IC, data=modeldata2, family=gaussian(link='identity'), id=id, corstr = 'exchangeable')
+anova(model1_g, model2_g)
+
+model3_g<-geeglm(SSolder_center~ChildAgeComposite+smkPreg_binary+global_PC1+global_PC2+cm1bsex+cm1inpov+ChildAgeComposite+Epi+IC+m1g2_YesNoPreg+m1g3_YesNoPreg, data=modeldata2, family=gaussian(link='identity'), id=id, corstr = 'exchangeable')
+anova(model2_g, model3_g)
+
+model4_g<-geeglm(SSolder_center~ChildAgeComposite+smkPreg_binary+global_PC1+global_PC2+cm1bsex+cm1inpov+ChildAgeComposite+Epi+IC+m1g2_YesNoPreg+m1g3_YesNoPreg+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth, data=modeldata2, family=gaussian(link='identity'), id=id, corstr = 'exchangeable')
+
+anova(model3_g, model4_g)
+
+model_4_g_int<-geeglm(SSolder_center~ChildAgeComposite*smkPreg_binary+global_PC1+global_PC2+cm1bsex+cm1inpov+ChildAgeComposite+Epi+IC+m1g2_YesNoPreg+m1g3_YesNoPreg+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth, data=modeldata2, family=gaussian(link='identity'), id=id, corstr = 'exchangeable')
+
+```
+
+```{r show models the same, eval=F}
+model_4_g_int%>%tidy()%>%kable()
+model5_int%>%tidy()%>%kable()
+```
+
+```{r contrasts, eval=F}
+K<-matrix(c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 1)
+ageSlopeNoSmoke<-glht(model_4_g_int, linfct=K)
+K2<-matrix(c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1), 1)
+ageSlopeYesSmoke<-glht(model_4_g_int, linfct=K2)
+
+summary(ageSlopeNoSmoke); summary(ageSlopeYesSmoke)
+```
+
+```{r contrasts with ancestry, eval=F}
+#Spaghetti plot: 
+p<-ggplot(modeldata, aes(x=ChildAgeComposite, y=SSolder_center, group=id, color=smkPreg_binary))+geom_line(alpha=0.1)+geom_smooth(aes(group=smkPreg_binary), method='lm')
+plot_grid(p, p+facet_wrap(~ancestry), ncol=1)
+
+model_hispanic<-geeglm(SSolder_center~ChildAgeComposite*smkPreg_binary+local_PC1+local_PC2+cm1bsex+cm1inpov+Epi+IC, data=modeldata2%>%filter(ancestry=='Hispanic ancestry'), family=gaussian(link='identity'), id=id, corstr = 'exchangeable')
+
+K<-matrix(c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0), 1)
+ageSlopeNoSmoke<-glht(model_hispanic, linfct=K)
+K2<-matrix(c(0, 1, 0, 0, 0, 0, 0, 0,  0, 1), 1)
+ageSlopeYesSmoke<-glht(model_hispanic, linfct=K2)
+
+summary(ageSlopeNoSmoke); summary(ageSlopeYesSmoke)
+
+f<-data.frame(rbind(confint(ageSlopeNoSmoke)%>%tidy(), confint(ageSlopeYesSmoke)%>%tidy()), 'coef'=c('Age Slope \n No smoking', 'Age Slope \n Yes Smoking'), 'model'=c('cell type controlled', 'cell type controlled'))
+
+model_hispanic_nocellcounts<-geeglm(SSolder_center~ChildAgeComposite*smkPreg_binary+local_PC1+local_PC2+cm1bsex+cm1inpov, data=modeldata2%>%filter(ancestry=='Hispanic ancestry'), family=gaussian(link='identity'), id=id, corstr = 'exchangeable')
+
+K<-matrix(c(0, 1, 0, 0, 0, 0, 0, 0), 1)
+ageSlopeNoSmoke<-glht(model_hispanic_nocellcounts, linfct=K)
+K2<-matrix(c(0, 1, 0, 0, 0, 0, 0, 1), 1)
+ageSlopeYesSmoke<-glht(model_hispanic_nocellcounts, linfct=K2)
+
+f2<-data.frame(rbind(confint(ageSlopeNoSmoke)%>%tidy(), confint(ageSlopeYesSmoke)%>%tidy()), 'coef'=c('Age Slope \n No smoking', 'Age Slope \n Yes Smoking'), 'model'=c('not cell type controlled', 'not cell type controlled'))
+
+f3<-rbind(f, f2)
+ageslopes<-ggplot(f3, aes(y=coef, x=estimate, xmin=conf.low, xmax=conf.high))+geom_linerange()+geom_point()+scale_x_continuous()+ggtitle('Hispanic ancestry: \n age slope by smoking & CT control')+facet_wrap(~model)+theme_classic()
+
+ic_slopes<-ggplot(modeldata%>%filter(ancestry=='Hispanic ancestry'), aes(x=ChildAgeComposite, y=IC, group=id, color=smkPreg_binary))+geom_line(alpha=0.1)+geom_smooth(aes(group=smkPreg_binary), method='lm')+facet_wrap(~ancestry)+theme_classic()+scale_color_discrete('Prenatal maternal smoking')+scale_x_continuous('Child age (months)')+theme(legend.position='bottom')
+ssolder_slopes<-ggplot(modeldata%>%filter(ancestry=='Hispanic ancestry'), aes(x=ChildAgeComposite, y=SSolder_center, group=id, color=smkPreg_binary))+geom_line(alpha=0.1)+geom_smooth(aes(group=smkPreg_binary), method='lm')+facet_wrap(~ancestry)+theme_classic()+scale_color_discrete('Prenatal maternal smoking')+scale_x_continuous('Child age (months)')+theme(legend.position='bottom')+scale_y_continuous('sustained smoking \n older children \n polymethylation score')
+
+bottom_plot<-plot_grid(ssolder_slopes, ic_slopes,  ncol=2)
+
+```
+
+```{r plot age slopes cell type investigation, figure.width=10, eval=F}
+plot_grid(ageslopes, bottom_plot, ncol=1, align='v', axis = 'l')
+```
+
+
+# At this point, move to EWAS markdown if time remains 
+
+
+
+
+
+
+

@@ -1,0 +1,100 @@
+> #libraries
+> library(sjlabelled)
+> library(tidyr)
+> library(dplyr)
+
+Attaching package: ‘dplyr’
+
+The following object is masked from ‘package:sjlabelled’:
+
+    as_label
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+> library(purrr)
+> library(furrr)
+Loading required package: future
+> library(stringr)
+> library(sva)
+Loading required package: mgcv
+Loading required package: nlme
+
+Attaching package: ‘nlme’
+
+The following object is masked from ‘package:dplyr’:
+
+    collapse
+
+This is mgcv 1.8-35. For overview type 'help("mgcv-package")'.
+Loading required package: genefilter
+Loading required package: BiocParallel
+> 
+> 
+> #directory based programming
+> data.dir="/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/"
+> output.dir=paste0(data.dir, 'CreatedData/')
+> #variables 
+> var.filter=5000
+> 
+> #load in betaqc matrix
+> betaqc<-readRDS(file=paste0(data.dir, 'OGData/', "noob_filtered.rds"))
+> file.path(paste0(data.dir, 'CreatedData/'), list.files(paste0(data.dir, 'CreatedData/')))[(str_detect(file.path(paste0(data.dir, 'CreatedData/'), list.files(paste0(data.dir, 'CreatedData/'))), 'NoSmk'))]%>%map(load, envir=.GlobalEnv)
+[[1]]
+[1] "child_nosmoke"
+
+[[2]]
+[1] "teen_nosmoke"
+
+[[3]]
+[1] "twovisit_nosmoke"
+
+> 
+> pheno<-rbind(child_nosmoke, teen_nosmoke) # dataset with the most exclusion i.e. squaring dataset off for all models (excluding kids who smoke in figure)
+> 
+> #make a matrix of model data 
+> #filter beta matrix to only those in analytic subset 
+> betaqc <-betaqc[, colnames(betaqc) %in% pheno$MethID]
+> #check that dim of pheno and betaqc match 
+> try(if(nrow(modeldata)!=ncol(betaqc)) stop("# obs in betaqc & pheno do not match"))
+Error in nrow(modeldata) : object 'modeldata' not found
+> 
+> #want to make sure that the order of pheno and betaqc match
+> pheno=pheno[match(colnames(betaqc), pheno$MethID), ]
+> try(if(identical(colnames(betaqc), pheno$MethID)==FALSE) stop('STOP: Sample names do not match'))
+> 
+> #make model matrix including variable of interest as factor variable & adjustment variables 
+> mod=model.matrix(~as.factor(smkPreg_binary), data=pheno)
+> 
+> #make null model containing only adjustment variables
+> mod0=model.matrix(~1, data=pheno)
+> 
+> #run with reasonable variance filter (5k)
+> svobj=sva(betaqc, mod, mod0, vfilter=var.filter)
+Number of significant surrogate variables is:  19 
+Iteration (out of 5 ):1  2  3  4  5  > sv.v5k=data.frame(svobj$sv); colnames(sv.v5k)=paste('sv', 1:ncol(sv.v5k), sep='')
+> sv.v5k=cbind(pheno%>%select(id, idnum, MethID), sv.v5k)
+> save(sv.v5k, file=paste0(output.dir, 'sv5k.Rds'))
+> print('Finished running SVA at Variance Filter of 5000')
+[1] "Finished running SVA at Variance Filter of 5000"
+> 
+> #iterate over possible variance filters
+> possible.n=c(1000, 5000, 10000, 50000, 100000)
+> 
+> my_num.sv=function(x, y='be'){
++   n=num.sv(betaqc, mod, vfilter=x, method=y)
++   my.n=c(paste0('variance filter=', x, 'w/ ', y, 'method'), n)
++   return(my.n)
++ }
+> 
+> plan(multicore, workers=5)
+> sv.n.be=possible.n %>% future_map(my_num.sv)
+Error in future::getGlobalsAndPackages(fn, envir = env_fn, globals = TRUE) : 
+  The total size of the 2 globals exported for future expression (‘function (x, y = "be"); {; n = num.sv(betaqc, mod, vfilter = x, method = y); my.n = c(paste0("variance filter=", x, "w/ ", y, "method"),; n); return(my.n); }’) is 4.66 GiB.. This exceeds the maximum allowed size of 500.00 MiB (option 'future.globals.maxSize'). There are two globals: ‘betaqc’ (4.66 GiB of class ‘numeric’) and ‘mod’ (114.05 KiB of class ‘numeric’)
+Calls: %>% ... furrr_template -> get_globals_and_packages -> <Anonymous>
+Execution halted
