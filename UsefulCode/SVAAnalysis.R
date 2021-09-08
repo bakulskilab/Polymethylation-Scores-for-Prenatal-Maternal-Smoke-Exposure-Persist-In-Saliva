@@ -52,12 +52,12 @@ my_num.sv=function(x, y='be'){
   return(my.n)
 }
 
-plan(multicore, workers=5)
-sv.n.be=possible.n %>% future_map(my_num.sv)
+
+sv.n.be=possible.n %>% map(my_num.sv)
 save(sv.n.be, file=paste0(output.dir, 'nSVbe.Rdata'))
 
-plan(multicore, workers=5)
-sv.n.leek=possible.n %>% future_map(my_num.sv, y='leek')
+
+sv.n.leek=possible.n %>% map(my_num.sv, y='leek')
 save(sv.n.leek, file=paste0(output.dir, 'nSVleek.Rdata'))
 
 #run with no variance filter 
