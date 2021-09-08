@@ -1,0 +1,156 @@
+---
+title: "SVA Investigation"
+author: "F blostein"
+date: "9/8/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#libraries
+library(sjlabelled)
+library(tidyr)
+library(dplyr)
+library(purrr)
+library(furrr)
+library(stringr)
+library(sva)
+library(ggplot2)
+```
+
+# Surrogate variable analysis 
+
+```{r}
+datadir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/CreatedData/"
+
+file.path(datadir, list.files(datadir))[(str_detect(file.path(datadir, list.files(datadir)), 'NoSmk'))]%>%map(load, envir=.GlobalEnv)
+modeldata=rbind(child_nosmoke, teen_nosmoke)
+
+load(paste0(datadir, 'nSVbe.Rdata'))
+load(paste0(datadir, 'nSVleek.Rdata'))
+
+```
+
+## Main idea
+
+Use the beta matrix to calculate surrogate variables; control for these surrogate variables instead of for known covariates in multivariable models, i.e. regress global methylation on prenatal maternal smoking + surrogate variables etc, etc. 
+
+Surrogate variable models can be used in our EWAS and in our models that use summary methylation variables such as global methylation, methylation clocks and polymethylation scores. 
+
+I used John's code from 'Autism associated DNA methylation at birth from multiple tissues' code from the lab github as a guide. 
+
+I used the final, complete-case analytic subset from my analysis cleaning (excluding children with missing data in any of the model variables & excluding children who report ever smoking, n= `r nrow(modeldata)`). I only included the main predictor of interest in the SVA model, since that's what John did.  The tutorial says to include any variables of interest, so we may want to consider including age or ancestry as variables that we are holding out from the surrogate variable creation (or, do SVA separately by ancestry, see later)
+
+## Variance filtering and method of SVA 
+
+When the number of features is very large ($m>100,000$), the SVA procedure can take a long time, so the function includes a variance filter term. In this approach, the features are ranked from the most to least variable and only the first $x$ features are used. This improves computational time but caution should be used, as surrogate variables are only estimated on a subsection of the matrix.
+
+John doesn't do this, he said that running SVA on datasets he's worked on can take on the order of hours and for Fragile Families sample size he could envision it taking much longer. 
+
+I've been trying to run on the full matrix, submitting as a batch job. I've had several jobs run out of memory, so I've upped the memory available, but in the meantime I've been experimenting with different levels of variance cut-offs. I've also been varying the method of surrogate variable computation, two methods are available, 'be' which is the default (John uses this) and leek, which is an asymptomatic method intended for large sample sizes, see resource [1](https://support.bioconductor.org/p/97469/), [2](https://cebp.aacrjournals.org/content/cebp/suppl/2018/06/30/1055-9965.EPI-17-0728.DC1/187479_3_supp_4617635_p5bqpt.pdf)
+
+
+### Number of surrogate variables by variance filter and method of SVA
+
+```{r}
+df.param=data.frame(SV=as.numeric(c(c(unlist(sv.n.be)[c(F, T)]),
+                  c(unlist(sv.n.leek)[c(F, T)]))), 
+           method=c(c(rep('be', length(sv.n.be))), 
+                      c(rep('leek', length(sv.n.leek)))), 
+           varianceFilter=rep(c(1000, 5000, 10000, 50000, 100000), 2))
+
+ggplot(df.param, aes(x=varianceFilter,y=SV))+geom_point()+facet_wrap(~method)+scale_x_log10()+theme_classic()
+```
+
+I tested the number of predicted surrogate varaibles at a variance filter of 1,000 (lowest recommended), 5,000, 10,000, 50,000 and 100,000 features. At 1,000 features there were 42 surrogate variables when using the be method. John said this is high in his experience. Increasing the number of features to 500 halves the number of surrogate variables detected to 20, after that there is a minor increase in SVs.  Using the leek method, I get 0 surrogate variables (except when using a variance filter of 50k, at which point I get 2 surrogate variables)
+
+## Surrogate variables using 5,000 features 
+
+Based on the above, I've been examining the surrogate variables resulting from sva on 5,000 most variable features and the be method of calculation. 
+
+### Heatmap of known covariates and surrogate variables
+
+```{r load surrogate variables}
+load(file=paste0(datadir, 'sv5k.Rds'))
+my.pd=left_join(modeldata, sv.v5k)
+```
+
+
+```{r heatmap function}
+bring.the.heatmap.sv <- function(pd,covar,folder){
+  library(gplots)
+  
+  nsv <- length(grep('sv',names(pd)))
+  
+  #generate correlation matrix between SVs and variables
+  correlations <- matrix(0,nrow=length(covar),ncol=nsv)
+  colnames(correlations) <- paste('sv',1:nsv,sep='')
+  rownames(correlations) <- covar
+  
+  #take svs
+  svs <- pd[,colnames(correlations)]
+  
+  #correlations between svs and variables:
+  # cor test if continuous
+  # anova is multi category
+  # t-test if two category
+  for(col in covar){
+    var <- pd[,col]
+    #check to see if it is numeric and isn't really a two category thing
+    if(class(var)=='numeric' & dim(table(var))>2){
+      correlations[col,] <- apply(svs,2,FUN = function(x,y) cor.test(x,y)$p.value,y=var)
+    }else{
+      if(length(levels(factor(var)))>2){
+        correlations[col,] <- apply(svs,2,FUN = function(x,y) anova(lm(x~y))$'Pr(>F)'[1],y=var)
+      }else{
+        correlations[col,] <- apply(svs,2,FUN = function(x,y) t.test(x~y)$p.value,y=var)
+      }
+    }
+  }
+  
+  #pdf(paste0(folder,'heatmap-sv.pdf'))
+  color.gradient <- colorRampPalette(c('firebrick','ivory3','royalblue'),bias=3)
+  heatmap.2(correlations,Rowv=FALSE,Colv=FALSE,cexRow=1,cexCol=1,dendrogram='none',density.info='none',trace='none',
+            col=color.gradient(20), key.xlab='p-value', main='Associations Between SVs\n and Given Covariates',
+            #lmat=rbind(c(0,3,3,3),c(2,0,4,0),c(0,1,1,1)), lhei=c(0.5,1.5,3), lwid=c(0.12,0.145,0.4,0.335),
+            margin=c(4,12)
+            )
+  #dev.off()
+  
+  #return('check your plot')
+}
+```
+
+```{r plot heatmap, fig.width=20, fig.height=12}
+bring.the.heatmap.sv(my.pd, c('smkPreg_binary', 'Sample_Plate', 'Slide', 'Array', 'ChildAgeComposite', 'ancestry', 'cm1bsex', 'Epi', 'Fib', 'IC', 'cm1inpov', 'm1g2_YesNoPreg', 'm1g3_YesNoPreg', 'PostnatalMaternalSmokingAny', 'SmkAtVisitPastmonth'))
+```
+
+## Ancestry-stratified vs non-stratified 
+
+Another thing John and I chatted about briefly was the iquestion of whether surrogate variables should be run in the entire analytic subset or separately in each strata for stratified models, this was John's take: 
+
+> hm, reminds me of the question of whether you should re-compute genetic PCs in SNPs after stratifying where there isn't a clear answer
+my only concern would be if something that strongly impacts methylation, like smoking, has huge race/ethnicity differences
+I'm not sure if that would mess with surrogate variables
+
+Again, using the variance filter to 5000 features and the 'be' method, I calculated the surrogate variables in each ancestry subset separately. 
+
+```{r}
+load(file=paste0(datadir, 'svAncestry5k.Rds'))
+```
+
+Fairly similar numbers of surrogate variables were detected, with fewer in the European and Hispanic groups, supporting the notion that larger sample size may lead to the detection of more surrogate variables (number of surrogate variables = `r sv.ancestry %>% summarise(sv_num=map(sv, ncol))%>%pull(sv_num)%>%unlist()%>%paste0(., collapse=', ')` in the African, European and Hispanic ancestry groups respectively). 
+
+```{r}
+pd.ancestry=sv.ancestry %>% mutate(pd=map2(data, sv, left_join))
+```
+```{r, echo=FALSE,results='hide',fig.keep='all'}
+map(.x=pd.ancestry$pd, .f=~(bring.the.heatmap.sv(as.data.frame(.x), covar=c('smkPreg_binary', 'Sample_Plate', 'Slide', 'Array', 'ChildAgeComposite', 'cm1bsex', 'Epi', 'Fib', 'IC', 'cm1inpov', 'm1g2_YesNoPreg', 'm1g3_YesNoPreg', 'PostnatalMaternalSmokingAny', 'SmkAtVisitPastmonth'))))
+```
+
+
+## Remaining questions 
+
+- What variance filter to use? or don't use any? 
+- Add more variables of interest to be held out in the surrogate analysis? 
+- Ancestry stratified or not for calculating SVs? 
