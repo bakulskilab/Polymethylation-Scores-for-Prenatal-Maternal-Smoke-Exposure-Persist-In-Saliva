@@ -47,10 +47,11 @@ output:
     self_contained: false
     pandoc_args: --mathjax
     number_sections: false
-bibliography: packages.bib
+bibliography: "Methylation_SmokingBib.bib"
 link-citations: true
 ---
 
+```{=html}
 <style>
 #main-img-left {
  width: 20%
@@ -62,7 +63,7 @@ link-citations: true
 width=20%
 }
 </style>
-
+```
 ```{r, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE,
                       warning = FALSE,
@@ -71,58 +72,79 @@ knitr::opts_chunk$set(echo = FALSE,
                       fig.align = 'center',
                       out.width = "100%")
 options(knitr.table.format = "html") 
+mydir="/nfs/turbo/bakulski1/People/blostein/FF_methylation/Code/Reports/Poster"
+imagedir=paste0(mydir, "/Images/")
+setwd(mydir)
 ```
 
 # Introduction
 
-This is the `posterdown_betterport` template for the {posterdown} package! I was inspired by the twitter thread of [Mike Morrison](https://mobile.twitter.com/mikemorrison/status/1110191245035479041) and wanted to apply the `#betterposter` concept to the reproducible (yet simple to use) functionality of the {posterdown} package [@R-posterdown]. If you're not an R user don't sweat as you do **NOT** need to use it at all! Feel free to use only the Markdown functionality of this package :)
+Prenatal maternal smoking is associated with DNA methylation in children [@Joubert:2016ue]. Thus, summary metrics of DNA methylation could serve as reliable and specific biomarkers of prenatal smoke exposure.
 
-```{r, include=FALSE}
-knitr::write_bib(c('posterdown', 'rmarkdown','pagedown'), 'packages.bib')
+```{r, joubert_fig, fig.cap='Volcano plot showing associations between CpG methylation in cord blood and prenatal maternal smoking exposure in @Joubert:2016ue'}
+knitr::include_graphics('Images/Joubert_volcano.jpeg')
 ```
 
-## Gaps
 
-1. Pick a template layout.
-2. Write/ create your poster content distraction free.
-3. Let posterdown do its thing!
+***But some gaps remain...!***
+
+1.  ![](Images/Icons/noun_blood%20sample_4011680.svg) **Tissue:** Previous studies have measured methylation in peripheral or cord blood. **Are the same methylation markers of prenatal maternal smoking also present in saliva, an easier to collect sample?**
+
+2.  ![](Images/Icons/noun_ethnicity_94199.svg) **Ancestry:** Previous study populations have been of European descent. **Are methylation markers of prenatal maternal smoking consistent across different ancestry groups?**
+
+3.  ![](Images/Icons/noun_Life%20Stages_398930.svg) **Time:** Previous study populations have examined methylation at a single cross-sectional time point in infancy or early childhood. **Are methylation markers of prenatal maternal smoking persistent as children age?**
+
+***We tested the association between prenatal maternal smoking and DNA methylation summary measures in sequential saliva samples from a diverse-ancestry, longitudinal birth cohort***
 
 # Methods
 
-I will show here how to include poster elements that may be useful, such as an equation using mathjax:
+The **Fragile Families and Child Wellbeing study** is a *longitudinal* cohort of US children followed from birth until 22 years of age.
+
+-   *Smoking during pregnancy*: Maternal interview at birth.
+
+-   *Methylation*: Saliva samples from 9 and 15 year visit; 450K chip.
+
+-   *Covariates*: Maternal alcohol and drug use during pregnancy (birth interview), income-to-poverty ratio (birth), maternal postnatal smoking (interviews), child smoking (interviews), child's genetic ancestry categorization (principal components of genetic data), cell type proportions (estimated from methylation data)
+
+```{r, ff_fig, fig.cap='Study design and timeline of exposure, outcome and covariate assessment in the Fragile Families and Child Wellbeing cohort'}
+knitr::include_graphics('Images/FF_studydesign.png')
+```
+
+## Methylation summary measures
+
+We used several common summary measures of methylation data, including global methylation and methylation clocks. We also created several prenatal maternal smoking specific polymethylation scores, using regression coefficients from @Joubert:2016ue.
+
+**Polymethylation scores**
+
+For $i$ individuals with $j$ CpG sites measured:
 
 $$
-E = mc^2
-$$
+Score_i=\sum \color{darkgreen} {\beta_{regression_{j}}} *  \color{darkblue} {t(B_{CpG_{ij}})}
+$$ 
 
-To reference a citation you can add your `.bib` file to the working directory and name it in the YAML metadata or generate an automated one as done here, then you only need to reference the label value in the `.bib` file. For example this package is built on top of the wonderful {pagedown} package and I will cite it at the end of this sentance using this in the rmd `[@R-pagedown]` [@R-pagedown].
+[Regression coefficients for CpG sites from a previous epigenome wide association analysis]{style="color: darkgreen;"}<sup>a</sup> are used to weight [each individual's methylation beta value at that CpG site]{style="color: darkblue;"}<sup>b</sup>. These weighted methylation values are summed across all CpG sites.
 
-To get a better understanding of how to include features like these please refer to the {posterdown} [wiki](https://github.com/posterdown/wiki).
+```{=html}
+<div style="line-height: 1em; margin-bottom:5px;">
 
-**_Now on to the results!_**
+<span style="color: darkgreen; font-size:18px"><sup>a</sup>We benchmarked 4 different regression coefficients made available in @</span>
+
+<span style="color: darkblue; font-size:18px"><sup>b</sup>Methylation beta values are continuous and bounded at $[0, 1]$. Concerned this might upweight the importance of highly methylated probes, we benchmarked 3 different transformations (t()) of methylation beta values: no transform, mean-centered and z-score.</span>
+
+</div>
+```
+
 
 # Results
 
 Here you may have some figures to show off, bellow I have made a scatterplot with the infamous Iris dataset and I can even reference to the figure automatically like this, `Figure \@ref(fig:irisfigure)`, Figure \@ref(fig:irisfigure).
 
-```{r, irisfigure, fig.cap='Here is a caption for the figure. This can be added by using the "fig.cap" option in the r code chunk options, see this [link](https://yihui.name/knitr/options/#plots) from the legend himself, [Yihui Xie](https://twitter.com/xieyihui).', out.width="80%"}
-par(mar=c(2,2,0,1))
-plot(x = iris$Sepal.Length, y = iris$Sepal.Width,
-     col = iris$Species, pch = 19, xlab = "Sepal Length",
-     ylab = "Sepal Width")
+```{r data read and set up}
+
 ```
 
-Maybe you want to show off some of that fancy code you spent so much time on to make that figure, well you can do that too! Just use the `echo=TRUE` option in the r code chunk options, Figure \@ref(fig:myprettycode)!
+```{r, irisfigure, fig.cap='Here is a caption for the figure. This can be added by using the "fig.cap" option in the r code chunk options, see this [link](https://yihui.name/knitr/options/#plots) from the legend himself, [Yihui Xie](https://twitter.com/xieyihui).', out.width="80%"}
 
-```{r myprettycode, echo=TRUE, fig.cap='Boxplots, so hot right now!', fig.height=6, out.width="80%"}
-#trim whitespace
-par(mar=c(2,2,0,0))
-#plot boxplots
-boxplot(iris$Sepal.Width~iris$Species,
-        col = "#008080", 
-        border = "#0b4545",
-        ylab = "Sepal Width (cm)",
-        xlab = "Species")
 ```
 
 How about a neat table of data? See, Table \@ref(tab:iristable):

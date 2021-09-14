@@ -6,3 +6,8 @@
 *.html
 *.docx
 *.doc
+Reports/Poster/Images/
+Reports/Poster/IGES_poster_vertical_files
+Reports/Poster/IGES_poster_files/
+*.log
+*.out
