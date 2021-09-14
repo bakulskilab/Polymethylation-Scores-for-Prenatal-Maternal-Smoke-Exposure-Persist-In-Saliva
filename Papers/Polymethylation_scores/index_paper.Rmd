@@ -3,6 +3,7 @@ title: "Polymethylation scores paper"
 author: "F blostein"
 date: "9/13/2021"
 output: pdf_document
+bib: Methylation_SmokingBib.bib
 ---
 
 ```{r child = here::here("Papers", "Polymethylation_scores", "01_titlepage.Rmd")}
@@ -11,4 +12,22 @@ output: pdf_document
 ```{r child = here::here("Papers", "Polymethylation_scores", "02_abstract.Rmd")}
 ```
 
+```{r child = here::here("Papers", "Polymethylation_scores", "03_keywords.Rmd")}
+```
 
+```{r child = here::here("Papers", "Polymethylation_scores", "04_background.Rmd")}
+```
+
+```{r child = here::here("Papers", "Polymethylation_scores", "05_results.Rmd")}
+```
+
+```{r child = here::here("Papers", "Polymethylation_scores", "06_discussion.Rmd")}
+```
+
+```{r child = here::here("Papers", "Polymethylation_scores", "07_conclusions.Rmd")}
+```
+
+```{r child = here::here("Papers", "Polymethylation_scores", "98_declarations.Rmd")}
+```
+
+# References

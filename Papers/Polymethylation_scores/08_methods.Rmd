@@ -1,0 +1,26 @@
+---
+output: html_document
+bibliography: "../Methylation_SmokingBib.bib"  
+---
+
+# Methods
+
+## Cohort
+
+The Fragile Families and Child Wellbeing Study (FFCW) is a nationally-representative cohort of nearly 5,000 children born in 20 U.S. cities between 1998 and 2000 [@Reichman:2001wv]. FFCW sampled births using a three-stage stratified random sample design, described in detail elsewhere [@Reichman:2001wv]. FFCW excluded the following births from the study: those with parents who planned to place the child for adoption, those where the father was deceased, those who did not speak English or Spanish well enough to be interviewed, those where the mothers or babies were too ill to complete the interview and those where the baby died before the interview could take place. At some of the hospitals, parents who were under 18 were not eligible to be interviewed due to hospital prohibition. Children were followed from birth until age fifteen. At the time of birth, medical record information was extracted from the hospital at which the mother gave birth. Interviews were conducted with the mother at birth in person and with father in person or over the telephone if he was not present. Interviews were also conducted with the mother and father when the child was one, three, five, and nine via telephone. Additionally, at ages three, five and nine, a separate primary caregiver survey was administered to the individual with whom the child was living either over the telephone or in the home. The child was interviewed at age nine in the home and at age fifteen by telephone or in the home. At ages nine and fifteen a saliva sample was taken from the child for DNA and DNA methylation measurements [@Reichman:2001wv].
+
+## Prenatal maternal smoking measurement
+
+## Covariates
+
+## DNA methylation measurement
+
+## Sample filtering
+
+## Probe filtering 
+
+## Methylation summary measures 
+
+We created several methylation summary measures. Global methylation was calculated for each sample as the mean methylation value of each sample across the cleaned probe set. Methylation clocks were calculated for each sample according to the methods of --INSERT HERE--. To create polymethylation scores, 6,000 (CHECK) CpG sites with regression coefficients reported in @Joubert:2016ue were multiplied by methylation beta values from FFCW and summed. We calculated polymethylation scores using regression coefficients from 4 different regressions reported in @Joubert:2016ue (LIST) and 3 different methods of transforming the methylation beta values (no transformation, mean center, and z-score standardization).
+
+## Statistical analysis 
