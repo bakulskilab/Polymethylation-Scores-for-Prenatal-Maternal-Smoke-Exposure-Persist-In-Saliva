@@ -73,6 +73,7 @@ knitr::opts_chunk$set(echo = FALSE,
                       out.width = "100%")
 options(knitr.table.format = "html") 
 mydir="/nfs/turbo/bakulski1/People/blostein/FF_methylation/Code/Reports/Poster"
+codedir="/nfs/turbo/bakulski1/People/blostein/FF_methylation/Code/"
 imagedir=paste0(mydir, "/Images/")
 setwd(mydir)
 ```
@@ -139,13 +140,34 @@ $$
 
 Here you may have some figures to show off, bellow I have made a scatterplot with the infamous Iris dataset and I can even reference to the figure automatically like this, `Figure \@ref(fig:irisfigure)`, Figure \@ref(fig:irisfigure).
 
-```{r data read and set up}
+## Table of smoking frequency in cohort and by ancestry 
 
+## Polymethylation scores are a specific, persistant and consistent marker of prenatal maternal smoke exposure
+
+```{r data read and set up}
+source(paste0(codedir, 'Scripts/', '03_summary_methyl_models.R'))
 ```
 
 ```{r, irisfigure, fig.cap='Here is a caption for the figure. This can be added by using the "fig.cap" option in the r code chunk options, see this [link](https://yihui.name/knitr/options/#plots) from the legend himself, [Yihui Xie](https://twitter.com/xieyihui).', out.width="80%"}
+my_outcomes=c('Global methylation', 'Pediatric clock', 'Sustained smoking polymethylation score (older children)')
+
+local_models%>%unnest(tidied)%>%
+  filter(term=='smkPreg_binaryYes' & predictors=='secondhand smoke exposure model')%>%
+  filter(outcome%in% my_outcomes)%>%
+  ggplot(aes(x=estimate, xmin=conf.low, xmax=conf.high, color=factor(age, rev(levels(age))), y=ancestry))+
+  geom_point(position = position_dodge(width = 1))+
+  geom_errorbarh(height=0.1, position = position_dodge(width = 1))+
+  facet_grid(.~outcome, scales='free_x', labeller = labeller(outcome=label_wrap_gen(15)))+
+  geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+
+  theme_classic()+
+  theme(text = element_text(size=16))+theme(legend.position = 'bottom')+
+  scale_color_discrete('', limits=c('Age 9', 'Age 15'))+
+  scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')+
+  scale_y_discrete('', limits=c('European ancestry', 'Hispanic ancestry', 'African ancestry'))
 
 ```
+
+## Polymethylation scores persisit from age 9 to age 15, with consistent associations 
 
 How about a neat table of data? See, Table \@ref(tab:iristable):
 
