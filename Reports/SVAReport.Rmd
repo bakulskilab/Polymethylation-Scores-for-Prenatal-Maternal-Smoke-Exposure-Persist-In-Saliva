@@ -2,11 +2,22 @@
 title: "SVA Investigation"
 author: "F blostein"
 date: "9/8/2021"
-output: html_document
+output:
+    html_document:
+      code_folding: show
+      highlight: tango
+      number_sections: yes
+      theme: sandstone
+      toc: yes
+      toc_depth: 2
+      toc_float: yes
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+
 #libraries
 library(sjlabelled)
 library(tidyr)
@@ -63,7 +74,7 @@ df.param=data.frame(SV=as.numeric(c(c(unlist(sv.n.be)[c(F, T)]),
 ggplot(df.param, aes(x=varianceFilter,y=SV))+geom_point()+facet_wrap(~method)+scale_x_log10()+theme_classic()
 ```
 
-I tested the number of predicted surrogate varaibles at a variance filter of 1,000 (lowest recommended), 5,000, 10,000, 50,000 and 100,000 features. At 1,000 features there were 42 surrogate variables when using the be method. John said this is high in his experience. Increasing the number of features to 500 halves the number of surrogate variables detected to 20, after that there is a minor increase in SVs.  Using the leek method, I get 0 surrogate variables (except when using a variance filter of 50k, at which point I get 2 surrogate variables)
+I tested the number of predicted surrogate varaibles at a variance filter of 1,000 (lowest recommended), 5,000, 10,000, 50,000 and 100,000 features. At 1,000 features there were 42 surrogate variables when using the be method. John said this is high in his experience. Increasing the number of features to 5000 halves the number of surrogate variables detected to 20, after that there is a minor increase in SVs. In the full matrix SV analysis (using all the CpG sites), there are 36 syrrigate variables.  Using the leek method, I get 0 surrogate variables (except when using a variance filter of 50k, at which point I get 2 surrogate variables)
 
 ## Surrogate variables using 5,000 features 
 
@@ -78,7 +89,7 @@ my.pd=left_join(modeldata, sv.v5k)
 
 
 ```{r heatmap function}
-bring.the.heatmap.sv <- function(pd,covar,folder){
+bring.the.heatmap.sv <- function(pd,covar,folder, name='Associations Between SVs\n and Given Covariates'){
   library(gplots)
   
   nsv <- length(grep('sv',names(pd)))
@@ -112,7 +123,7 @@ bring.the.heatmap.sv <- function(pd,covar,folder){
   #pdf(paste0(folder,'heatmap-sv.pdf'))
   color.gradient <- colorRampPalette(c('firebrick','ivory3','royalblue'),bias=3)
   heatmap.2(correlations,Rowv=FALSE,Colv=FALSE,cexRow=1,cexCol=1,dendrogram='none',density.info='none',trace='none',
-            col=color.gradient(20), key.xlab='p-value', main='Associations Between SVs\n and Given Covariates',
+            col=color.gradient(20), key.xlab='p-value', main=name,
             #lmat=rbind(c(0,3,3,3),c(2,0,4,0),c(0,1,1,1)), lhei=c(0.5,1.5,3), lwid=c(0.12,0.145,0.4,0.335),
             margin=c(4,12)
             )
@@ -122,7 +133,7 @@ bring.the.heatmap.sv <- function(pd,covar,folder){
 }
 ```
 
-```{r plot heatmap, fig.width=20, fig.height=12}
+```{r plot heatmap}
 bring.the.heatmap.sv(my.pd, c('smkPreg_binary', 'Sample_Plate', 'Slide', 'Array', 'ChildAgeComposite', 'ancestry', 'cm1bsex', 'Epi', 'Fib', 'IC', 'cm1inpov', 'm1g2_YesNoPreg', 'm1g3_YesNoPreg', 'PostnatalMaternalSmokingAny', 'SmkAtVisitPastmonth'))
 ```
 
@@ -148,7 +159,7 @@ pd.ancestry=sv.ancestry %>% mutate(pd=map2(data, sv, left_join))
 
 
 ```{r, echo=FALSE,results='hide',fig.keep='all'}
-map(.x=pd.ancestry$pd, .f=~(bring.the.heatmap.sv(as.data.frame(.x), covar=c('smkPreg_binary', 'Sample_Plate', 'Slide', 'Array', 'ChildAgeComposite', 'cm1bsex', 'Epi', 'Fib', 'IC', 'cm1inpov', 'm1g2_YesNoPreg', 'm1g3_YesNoPreg', 'PostnatalMaternalSmokingAny', 'SmkAtVisitPastmonth'))))
+map2(.x=pd.ancestry$pd, .y=paste('SV and covariate \n associations in', pd.ancestry$ancestry),  .f=~(bring.the.heatmap.sv(as.data.frame(.x), covar=c('smkPreg_binary', 'Sample_Plate', 'Slide', 'Array', 'ChildAgeComposite', 'cm1bsex', 'Epi', 'Fib', 'IC', 'cm1inpov', 'm1g2_YesNoPreg', 'm1g3_YesNoPreg', 'PostnatalMaternalSmokingAny', 'SmkAtVisitPastmonth'), name=.y)))
 ```
 
 ## Full matrix variable analysis
@@ -168,6 +179,8 @@ bring.the.heatmap.sv(my.pd.full, c('smkPreg_binary', 'Sample_Plate', 'Slide', 'A
 
 ## Modeling with full surrogate variable as controlled variables
 
+### Global w/ full matrix SVs 
+
 ```{r}
 source(paste0(codedir, "03_summary_methyl_models.R"))
 
@@ -177,16 +190,46 @@ global_models%>%unnest(tidied)%>%
   ggplot(aes(x=estimate, xmin=conf.low, xmax=conf.high, color=factor(age, rev(levels(age))), y=predictors))+
   geom_point(position = position_dodge(width = 1))+
   geom_errorbarh(height=0.1, position = position_dodge(width = 1))+
-  facet_grid(.~outcome, scales='free_x', labeller = labeller(outcome=label_wrap_gen(15)))+
+  facet_wrap(.~outcome, scales='free_x', labeller = labeller(outcome=label_wrap_gen(15)), ncol=3)+
   geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+
   theme_classic()+
-  theme(text = element_text(size=16))+theme(legend.position = 'bottom')+
+  theme(text = element_text(size=12))+theme(legend.position = 'bottom')+
+  scale_color_discrete('', limits=c('Age 9', 'Age 15'))+
+  scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')
+```
+
+### Local (ancestry-specific)
+
+```{r}
+local_models%>%unnest(tidied)%>%
+  filter(term=='smkPreg_binaryYes')%>%
+  filter(outcome%in% c('Global methylation', 'Pediatric clock', 'GRIM clock'))%>%
+  ggplot(aes(x=estimate, xmin=conf.low, xmax=conf.high, color=factor(age, rev(levels(age))), y=predictors))+
+  geom_point(position = position_dodge(width = 1))+
+  geom_errorbarh(height=0.1, position = position_dodge(width = 1))+
+  facet_grid(ancestry~outcome, scales='free_x', labeller = labeller(outcome=label_wrap_gen(15)))+
+  geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+
+  theme_classic()+
+  theme(text = element_text(size=12))+theme(legend.position = 'bottom')+
   scale_color_discrete('', limits=c('Age 9', 'Age 15'))+
   scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')
 
-       
-       
+local_models%>%unnest(tidied)%>%
+  filter(term=='smkPreg_binaryYes')%>%
+  filter(str_detect(outcome, 'score'))%>%
+  ggplot(aes(x=estimate, xmin=conf.low, xmax=conf.high, color=factor(age, rev(levels(age))), y=predictors))+
+  geom_point(position = position_dodge(width = 1))+
+  geom_errorbarh(height=0.1, position = position_dodge(width = 1))+
+  facet_grid(ancestry~outcome, scales='free_x', labeller = labeller(outcome=label_wrap_gen(15)))+
+  geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+
+  theme_classic()+
+  theme(text = element_text(size=12))+theme(legend.position = 'bottom')+
+  scale_color_discrete('', limits=c('Age 9', 'Age 15'))+
+  scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')
 ```
+
+
+
 ## Remaining questions 
 
 - What variance filter to use? or don't use any? 

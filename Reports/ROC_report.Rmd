@@ -1,0 +1,98 @@
+---
+title: "ROC curve analysis"
+author: "F blostein"
+date: "9/27/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source()
+```
+
+```{r}
+#investigate adding in covariates and effect on ROC curve 
+#question for kelly --> only use methylation or use methylation + base model
+#don't think it's reasonable to use prenatal exposures + postantal smoking 
+# could we predict peoples prenatal smoke exposure when we don't have info on maternal smoking/behaviors 
+
+global_roc%>%dplyr::select(covariates, methylation, childteen, test)%>%unnest(test) %>% 
+  filter(str_detect(methylation, 'SSnewbornCT|cg055|global|pediatric'))%>%
+  ggplot(aes(x=spec, y=sens, color=covariates))+geom_line()+
+  facet_grid(childteen~methylation, labeller=labeller(childteen=age_labels, methylation=outcome_labels))+
+  theme_classic()+theme(legend.position = 'bottom')+guides(color=guide_legend(nrow=6,byrow=TRUE))+
+  geom_abline(intercept=1, slope=-1, color='black')
+
+#is prediction better when using PMS? 
+global_roc%>%dplyr::select(predictors, covariates, methylation, childteen, test)%>%
+  mutate(modeltype=ifelse(str_detect(predictors, '\\+'), covariates, 'No covariates'))%>%
+  unnest(test) %>% 
+  filter(str_detect(methylation, 'SSnewbornCT|cg055|global|pediatric') &
+           !str_detect(covariates, 'm1g2|sv'))%>%
+  ggplot(aes(x=spec, y=sens, color=methylation, linetype=modeltype))+geom_line()+
+  facet_grid(childteen~., labeller=labeller(childteen=age_labels))+
+  scale_color_discrete(labels=outcome_labels)+
+  theme_classic()+theme(legend.position = 'right')+guides(color=guide_legend(nrow=4,byrow=TRUE))+
+  geom_abline(intercept=1, slope=-1, color='black')
+
+global_roc%>%dplyr::select(predictors, covariates, methylation, childteen, test)%>%
+  mutate(modeltype=ifelse(str_detect(predictors, '\\+'), covariates, 'No covariates'))%>%
+  unnest(test) %>% 
+  filter(str_detect(methylation, 'SSnewbornCT|cg055|global|pediatric') &
+           covariates=='')%>%
+  ggplot(aes(x=spec, y=sens, color=methylation, linetype=modeltype))+geom_line()+
+  facet_grid(childteen~., labeller=labeller(childteen=age_labels))+
+  scale_color_discrete(labels=outcome_labels)+
+  theme_classic()+theme(legend.position = 'right')+guides(color=guide_legend(nrow=4,byrow=TRUE))+
+  geom_abline(intercept=1, slope=-1, color='black')
+
+
+#is best methylation predictor consistent across ancestries
+local_roc %>% dplyr::select(covariates, predictors, childteen, ancestry, test)%>%unnest(test)%>% 
+  filter(str_detect(predictors, 'SSnewbornCT|cg055|global|pediatric') & covariates=='')%>%
+  ggplot(aes(x=spec, y=sens, color=predictors))+
+  facet_grid(childteen~ancestry)+geom_line()
+
+#things get weird when using the base model vars
+local_roc %>% dplyr::select(covariates, predictors, childteen, ancestry, test)%>%unnest(test)%>% 
+  filter(str_detect(predictors, 'SSnewbornCT|cg055|global|pediatric') & covariates!='')%>%
+  ggplot(aes(x=spec, y=sens, color=predictors))+
+  facet_grid(childteen~ancestry)+geom_line()
+
+#investigated change in ROC when adding in each base model var individually
+local_roc_test%>% dplyr::select(covariates, predictors, childteen, ancestry, test)%>%unnest(test)%>% 
+  filter(str_detect(predictors, 'global'))%>%
+  ggplot(aes(x=spec, y=sens, color=predictors))+
+  facet_grid(childteen~ancestry)+geom_line()
+#big jump in ROC curve for European & hispanic - batch variable 
+#big jump in ROC curve for European - poverty and hispanic - local pcs
+modeldata %>%filter(ancestry=='Hispanic ancestry' & childteen=='T')%>%xtabs(~Sample_Plate+smkPreg_binary, data=.)
+
+#is prediction improved when using two time points? 
+
+global_roc%>%dplyr::select(covariates, methylation, childteen, test)%>%unnest(test) %>% 
+  filter(str_detect(methylation, 'SSnewbornCT|cg055|global|pediatric') & covariates=='')%>%
+  rbind(long_global_roc%>% mutate(childteen='C+T', methylation=gsub('_C.*', '', methylation))%>%
+          dplyr::select(covariates, methylation, childteen, test)%>%
+          unnest(test) %>% 
+          filter(str_detect(methylation, 'SSnewbornCT|cg055|global|pediatric') & covariates==''))%>%
+  ggplot(aes(x=spec, y=sens, color=childteen))+geom_line()+
+  facet_wrap(~methylation)+
+  scale_color_discrete(labels=outcome_labels)+
+  theme_classic()+theme(legend.position = 'right')+guides(color=guide_legend(nrow=4,byrow=TRUE))+
+  geom_abline(intercept=1, slope=-1, color='black')
+
+global_roc%>%dplyr::select(covariates, methylation, childteen, test)%>%unnest(test) %>% 
+  filter(str_detect(methylation, 'SSnewbornCT|cg055') & covariates=='')%>%
+  rbind(long_global_roc%>% mutate(childteen='C+T', methylation=gsub('_C.*', '', methylation))%>%
+          dplyr::select(covariates, methylation, childteen, test)%>%
+          unnest(test) %>% 
+          filter(str_detect(methylation, 'SSnewbornCT|cg055') & covariates==''))%>%
+  ggplot(aes(x=spec, y=sens, color=childteen))+geom_line()+
+  facet_wrap(~methylation)+
+  scale_color_discrete(labels=outcome_labels)+
+  theme_classic()+theme(legend.position = 'right')+guides(color=guide_legend(nrow=4,byrow=TRUE))+
+  geom_abline(intercept=1, slope=-1, color='black')
+
+```
+

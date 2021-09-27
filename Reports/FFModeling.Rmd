@@ -71,7 +71,7 @@ export2md(strataTable(createTable(compareGroups(smkPreg_binary~globalmethylation
 ## Methylation summary metrics, confounders and precision variables by prenatal maternal smoking, ancestry stratified at 9 year visit
 
 ```{r bivariate table stratified by visit and ancestry child visit}
-export2md(strataTable(createTable(compareGroups(smkPreg_binary~globalmethylation+pediatric+levine+anynewborn_center+SSnewbornCT_center+SSolder_center+Epi+Fib+IC+ChildAgeComposite+cm1inpov+cm1bsex+m1g2_YesNoPreg+m1g3_YesNoPreg+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth, data=modeldata%>%filter(childteen=='C'))), 'ancestry'))
+export2md(strataTable(createTable(compareGroups(smkPreg_binary~globalmethylation+pediatric+levine+anynewborn_center+SSnewbornCTw_center+SSolder_center+Epi+Fib+IC+ChildAgeComposite+cm1inpov+cm1bsex+m1g2_YesNoPreg+m1g3_YesNoPreg+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth, data=modeldata%>%filter(childteen=='C'))), 'ancestry'))
 ```
 ## Methylation summary metrics, confounders and precision variables by prenatal maternal smoking, ancestry stratified at 15 year visit
 
