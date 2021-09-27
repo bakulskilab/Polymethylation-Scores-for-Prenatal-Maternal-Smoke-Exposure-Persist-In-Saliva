@@ -62,8 +62,13 @@ link-citations: true
 #main-img-right {
 width=20%
 }
+.mybreak {
+   break-before: column;
+}
 </style>
 ```
+
+
 ```{r, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE,
                       warning = FALSE,
@@ -82,7 +87,7 @@ setwd(mydir)
 
 Prenatal maternal smoking is associated with DNA methylation in children [@Joubert:2016ue]. Thus, summary metrics of DNA methylation could serve as reliable and specific biomarkers of prenatal smoke exposure.
 
-```{r, joubert_fig, fig.cap='Volcano plot showing associations between CpG methylation in cord blood and prenatal maternal smoking exposure in @Joubert:2016ue'}
+```{r, joubertfigure, fig.cap='Volcano plot showing associations between CpG methylation in cord blood and prenatal maternal smoking exposure in @Joubert:2016ue'}
 knitr::include_graphics('Images/Joubert_volcano.jpeg')
 ```
 
@@ -97,7 +102,9 @@ knitr::include_graphics('Images/Joubert_volcano.jpeg')
 
 ***We tested the association between prenatal maternal smoking and DNA methylation summary measures in sequential saliva samples from a diverse-ancestry, longitudinal birth cohort***
 
-# Methods
+
+
+# Methods {.mybreak}
 
 The **Fragile Families and Child Wellbeing study** is a *longitudinal* cohort of US children followed from birth until 22 years of age.
 
@@ -107,7 +114,7 @@ The **Fragile Families and Child Wellbeing study** is a *longitudinal* cohort of
 
 -   *Covariates*: Maternal alcohol and drug use during pregnancy (birth interview), income-to-poverty ratio (birth), maternal postnatal smoking (interviews), child smoking (interviews), child's genetic ancestry categorization (principal components of genetic data), cell type proportions (estimated from methylation data)
 
-```{r, ff_fig, fig.cap='Study design and timeline of exposure, outcome and covariate assessment in the Fragile Families and Child Wellbeing cohort'}
+```{r, FFfigure, fig.cap='Study design and timeline of exposure, outcome and covariate assessment in the Fragile Families and Child Wellbeing cohort'}
 knitr::include_graphics('Images/FF_studydesign.png')
 ```
 
@@ -135,23 +142,47 @@ $$
 </div>
 ```
 
-
-# Results
-
-Here you may have some figures to show off, bellow I have made a scatterplot with the infamous Iris dataset and I can even reference to the figure automatically like this, `Figure \@ref(fig:irisfigure)`, Figure \@ref(fig:irisfigure).
-
-## Table of smoking frequency in cohort and by ancestry 
-
-## Polymethylation scores are a specific, persistant and consistent marker of prenatal maternal smoke exposure
+ 
+# Results 
 
 ```{r data read and set up}
 source(paste0(codedir, 'Scripts/', '03_summary_methyl_models.R'))
 ```
 
-```{r, irisfigure, fig.cap='Here is a caption for the figure. This can be added by using the "fig.cap" option in the r code chunk options, see this [link](https://yihui.name/knitr/options/#plots) from the legend himself, [Yihui Xie](https://twitter.com/xieyihui).', out.width="80%"}
-my_outcomes=c('Global methylation', 'Pediatric clock', 'Sustained smoking polymethylation score (older children)')
+**Methylation summary metrics by prenatal maternal smoking and child age**
 
-local_models%>%unnest(tidied)%>%
+Table \@table1 shows the distributions of methylation summary measures ancestry (inferred from ellipses of genetic principal components) by prenatal maternal smoke exposure (yes=exposed, no=unexposed) and visit (C=age 9 visit, T=age 15 visit). 
+
+```{r, table1}
+export2md(strataTable(createTable(compareGroups(smkPreg_binary~globalmethylation+pediatric+SSnewbornCT_center+ancestry, data=modeldata)), 'childteen'))
+```
+
+## Polymethylation scores are correlated and stable between age 9 and age 15
+
+```{r}
+outcome_labels=c('Global methylation', 'Pediatric clock', 'Polymethylation score \n (newborn, cell-type controlled, mean centered)')
+names(outcome_labels)=c('globalmethylation', 'pediatric', 'SSnewbornCT_center')
+modeldata%>%dplyr::select(idnum, childteen, SSnewbornCT_center, globalmethylation, pediatric)%>%pivot_longer(cols=c(globalmethylation, pediatric, SSnewbornCT_center), names_to='Methylation summary measure type', values_to='Methylation summary measure')%>%pivot_wider(names_from=childteen, values_from=`Methylation summary measure`)%>%ggplot(aes(x=C, y=T))+geom_point()+stat_cor()+geom_smooth(method=lm)+theme_classic()+scale_x_continuous('Age 9 score')+scale_y_continuous('Age 15 score')+facet_wrap(~`Methylation summary measure type`, scales='free', labeller = labeller(`Methylation summary measure type`=outcome_labels))
+```
+
+```{r}
+modeldata %>% pivot_longer(cols=c('globalmethylation', 'pediatric', 'SSnewbornCT_center'), names_to='measuretype', values_to='Methylation summary measure')%>%ggplot(aes(x=childteen, y=`Methylation summary measure`, group=idnum))+geom_point()+geom_line(alpha=0.1, color='grey')+geom_smooth(aes(group=1), method='lm', fill='blue')+facet_wrap(~measuretype, scales='free_y', labeller = labeller(measuretype=outcome_labels))+theme_classic()+scale_x_discrete('', labels=c('Age 9', 'Age 15'))
+```
+
+## Polymethylation scores are a specific, persistant and consistent marker of prenatal maternal smoke exposure
+
+```{r, forestplot, fig.cap='Forest plot from ancestry-specific regressions of prenatal maternal smoking against various methylation summary metrics. All models control for child sex, mother income to poverty ratio at birth, epithelial and immune cell proportions (estimated from methylation data), maternal other drug and other alcohol use during pregnancy, batch, genetic ancestry (1st two principal components of genetic data), postnatal smoke exposure (any postnatal maternal smoking and maternal packs per day in month prior to visit) ', out.width="80%"}
+my_outcomes=c('Global methylation', 'Pediatric clock', 'Sustained smoking polymethylation score (newborns, cell-type controlled)')
+
+data_text=local_models%>%
+  mutate(n=map_dbl(data, nrow), n=paste0('n=', n), x=-0.01)%>%
+  unnest(tidied)%>%
+  filter(outcome=='Global methylation' & term=='smkPreg_binaryYes'& predictors=='secondhand smoke exposure model')
+  
+
+local_models%>%
+  mutate(n=map_dbl(data, nrow), n=paste0('n=', n))%>%
+  unnest(tidied)%>%
   filter(term=='smkPreg_binaryYes' & predictors=='secondhand smoke exposure model')%>%
   filter(outcome%in% my_outcomes)%>%
   ggplot(aes(x=estimate, xmin=conf.low, xmax=conf.high, color=factor(age, rev(levels(age))), y=ancestry))+
@@ -159,6 +190,7 @@ local_models%>%unnest(tidied)%>%
   geom_errorbarh(height=0.1, position = position_dodge(width = 1))+
   facet_grid(.~outcome, scales='free_x', labeller = labeller(outcome=label_wrap_gen(15)))+
   geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+
+  geom_text(data=data_text, aes(x=x,label=n), position=position_dodge(width = 1), hjust=0.5)+
   theme_classic()+
   theme(text = element_text(size=16))+theme(legend.position = 'bottom')+
   scale_color_discrete('', limits=c('Age 9', 'Age 15'))+
@@ -167,20 +199,8 @@ local_models%>%unnest(tidied)%>%
 
 ```
 
-## Polymethylation scores persisit from age 9 to age 15, with consistent associations 
-
-How about a neat table of data? See, Table \@ref(tab:iristable):
-
-```{r, iristable}
-knitr::kable(
-  iris[1:15,1:5], format = "html",
-  caption = "A table made with the **knitr::kable** function.",
-  align = "c", col.names = c("Sepal <br> Length",
-                             "Sepal <br> Width",
-                             "Petal <br> Length",
-                             "Petal <br> Width",
-                             "Species"),
-  escape = FALSE)
-```
+# Conclusions
 
 # References
+
+
