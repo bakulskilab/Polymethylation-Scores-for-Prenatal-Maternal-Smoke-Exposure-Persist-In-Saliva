@@ -160,13 +160,22 @@ export2md(strataTable(createTable(compareGroups(smkPreg_binary~globalmethylation
 ## Polymethylation scores are correlated and stable between age 9 and age 15
 
 ```{r}
-outcome_labels=c('Global methylation', 'Pediatric clock', 'Polymethylation score \n (newborn, cell-type controlled, mean centered)')
+outcome_labels=c('Global methylation', 'Pediatric clock', 'Polymethylation score \n (newborn, mean centered)')
 names(outcome_labels)=c('globalmethylation', 'pediatric', 'SSnewbornCT_center')
-modeldata%>%dplyr::select(idnum, childteen, SSnewbornCT_center, globalmethylation, pediatric)%>%pivot_longer(cols=c(globalmethylation, pediatric, SSnewbornCT_center), names_to='Methylation summary measure type', values_to='Methylation summary measure')%>%pivot_wider(names_from=childteen, values_from=`Methylation summary measure`)%>%ggplot(aes(x=C, y=T))+geom_point()+stat_cor()+geom_smooth(method=lm)+theme_classic()+scale_x_continuous('Age 9 score')+scale_y_continuous('Age 15 score')+facet_wrap(~`Methylation summary measure type`, scales='free', labeller = labeller(`Methylation summary measure type`=outcome_labels))
+
+modeldata%>%dplyr::select(idnum, childteen, SSnewbornCT_center, globalmethylation, pediatric)%>%pivot_longer(cols=c(globalmethylation, pediatric, SSnewbornCT_center), names_to='Methylation summary measure type', values_to='Methylation summary measure')%>%pivot_wider(names_from=childteen, values_from=`Methylation summary measure`)%>%mutate(meth_f=factor(`Methylation summary measure type`, levels=c('SSnewbornCT_center', 'globalmethylation', 'pediatric')))%>%ggplot(aes(x=C, y=T))+geom_point()+stat_cor()+geom_smooth(method=lm)+theme_classic()+scale_x_continuous('Age 9 score')+scale_y_continuous('Age 15 score')+facet_wrap(~meth_f, scales='free', labeller = labeller(meth_f=outcome_labels))+theme(text=element_text(size=16))
+
+
 ```
 
 ```{r}
-modeldata %>% pivot_longer(cols=c('globalmethylation', 'pediatric', 'SSnewbornCT_center'), names_to='measuretype', values_to='Methylation summary measure')%>%ggplot(aes(x=childteen, y=`Methylation summary measure`, group=idnum))+geom_point()+geom_line(alpha=0.1, color='grey')+geom_smooth(aes(group=1), method='lm', fill='blue')+facet_wrap(~measuretype, scales='free_y', labeller = labeller(measuretype=outcome_labels))+theme_classic()+scale_x_discrete('', labels=c('Age 9', 'Age 15'))
+modeldata %>%group_by(idnum)%>%filter(n()>1)%>%pivot_longer(cols=c('globalmethylation', 'pediatric', 'SSnewbornCT_center'), names_to='measuretype', values_to='Methylation summary measure')%>%group_by(measuretype, idnum) %>%
+    mutate(slope = (`Methylation summary measure`[childteen=='T'] - `Methylation summary measure`[childteen=='C'])/(2-1))%>%filter(!is.na(`Methylation summary measure`))%>%
+  ggplot(aes(x=childteen, y=`Methylation summary measure`, group=idnum))+geom_point()+geom_line(alpha=0.1, aes(color=slope>0))+geom_smooth(aes(group=1), method='lm', fill='blue')+facet_wrap(~measuretype, scales='free_y', labeller = labeller(measuretype=outcome_labels))+theme_classic()+scale_x_discrete('', labels=c('Age 9', 'Age 15'))+scale_color_manual(name='', labels=c('slope<0', 'slope>0'), values=c('blue', 'red'))
+
+
+modeldata %>%group_by(idnum)%>%filter(n()>1)%>%pivot_longer(cols=c('globalmethylation', 'pediatric', 'SSnewbornCT_center'), names_to='measuretype', values_to='Methylation summary measure')%>%group_by(measuretype, idnum) %>%
+    mutate(slope = (`Methylation summary measure`[childteen=='T'] - `Methylation summary measure`[childteen=='C'])/(2-1), slope_factor=case_when(slope>0~'Positive', slope<=0~'Negative'))%>%filter(!is.na(`Methylation summary measure`))%>%ggplot(aes(x=slope))+geom_histogram()+geom_blank(aes(x=-slope)) + facet_wrap(~measuretype, scales='free', ncol=1)
 ```
 
 ## Polymethylation scores are a specific, persistant and consistent marker of prenatal maternal smoke exposure
@@ -174,28 +183,31 @@ modeldata %>% pivot_longer(cols=c('globalmethylation', 'pediatric', 'SSnewbornCT
 ```{r, forestplot, fig.cap='Forest plot from ancestry-specific regressions of prenatal maternal smoking against various methylation summary metrics. All models control for child sex, mother income to poverty ratio at birth, epithelial and immune cell proportions (estimated from methylation data), maternal other drug and other alcohol use during pregnancy, batch, genetic ancestry (1st two principal components of genetic data), postnatal smoke exposure (any postnatal maternal smoking and maternal packs per day in month prior to visit) ', out.width="80%"}
 my_outcomes=c('Global methylation', 'Pediatric clock', 'Sustained smoking polymethylation score (newborns, cell-type controlled)')
 
-data_text=local_models%>%
-  mutate(n=map_dbl(data, nrow), n=paste0('n=', n), x=-0.01)%>%
-  unnest(tidied)%>%
-  filter(outcome=='Global methylation' & term=='smkPreg_binaryYes'& predictors=='secondhand smoke exposure model')
-  
+all_models=rbind(local_models, global_models%>%mutate(ancestry='Unstratified'))
 
-local_models%>%
+data_text=all_models%>%
+  mutate(n=map_dbl(data, nrow), n=paste0('n=', n), x=-0.25)%>%
+  unnest(tidied)%>%
+  filter(outcome=='Sustained smoking polymethylation score (newborns, cell-type controlled)' & term=='smkPreg_binaryYes'& predictors=='secondhand smoke exposure model')%>%mutate(outcome_f=outcome)
+  
+names(outcome_labels)=my_outcomes
+all_models%>%
   mutate(n=map_dbl(data, nrow), n=paste0('n=', n))%>%
   unnest(tidied)%>%
   filter(term=='smkPreg_binaryYes' & predictors=='secondhand smoke exposure model')%>%
   filter(outcome%in% my_outcomes)%>%
+    mutate(outcome_f=factor(outcome, levels=rev(my_outcomes)))%>%
   ggplot(aes(x=estimate, xmin=conf.low, xmax=conf.high, color=factor(age, rev(levels(age))), y=ancestry))+
   geom_point(position = position_dodge(width = 1))+
   geom_errorbarh(height=0.1, position = position_dodge(width = 1))+
-  facet_grid(.~outcome, scales='free_x', labeller = labeller(outcome=label_wrap_gen(15)))+
+  facet_grid(.~outcome_f, scales='free_x', labeller = labeller(outcome_f=outcome_labels))+
   geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+
-  geom_text(data=data_text, aes(x=x,label=n), position=position_dodge(width = 1), hjust=0.5)+
+  geom_text(data=data_text, aes(x=x,label=n), position=position_dodge(width = 1), hjust=0.05)+
   theme_classic()+
   theme(text = element_text(size=16))+theme(legend.position = 'bottom')+
   scale_color_discrete('', limits=c('Age 9', 'Age 15'))+
   scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')+
-  scale_y_discrete('', limits=c('European ancestry', 'Hispanic ancestry', 'African ancestry'))
+  scale_y_discrete('', limits=c('European ancestry', 'Hispanic ancestry', 'African ancestry', 'Unstratified'))+scale_color_manual('', values=c('black', 'darkgrey'))
 
 ```
 
