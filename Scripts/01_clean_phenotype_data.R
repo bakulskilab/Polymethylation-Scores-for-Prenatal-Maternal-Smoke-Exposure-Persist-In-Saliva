@@ -44,7 +44,8 @@ smokingvars<-c("m1g4", "f1g4", "f2j5", "f2j5a", "f2j7", "f2j7a", "f3j31", "f3j32
 prenataldrugusevar<-c("m1g2", "m1g3", "m1g5", "m1g6")
 FF_labeled=pheno %>%dplyr::select(any_of(c(idvars, demovars, smokingvars, prenataldrugusevar)))
 #apply NA codes
-my_na_codes<-c("-1 Refuse", "-2 Don't know", "-3 Missing", "-9 Not in wave")
+my_na_codes<-c(-10:-1, "-1 Refuse", "-2 Don't know", "-3 Missing", "-9 Not in wave", "-7 N/A")
+my_na_codes_numeric=
 na_codes <- function(x, ...) {
   x[x %in% c(...)] <- NA
   if(is.factor(x)==TRUE){x<-droplevels(x)}
@@ -138,14 +139,12 @@ myFF<-myFF %>%
       (childteen=='T' & as.numeric(substr(p6h77, 1, 1))>2) ~ "Pack or more a day", 
     (childteen=='C' & ( as.numeric(substr(m5g18, 1, 1))==1 | as.numeric(substr(n5f18, 1, 1))==1) ) | 
       (childteen=='T' & (as.numeric(substr(p6h77, 1, 1))%in% c(1, 2)))  ~ "Less than pack a day", 
-    (childteen=='C' & ( is.na(m5g18) & (is.na(n5f17) | n5f17=='-7 N/A') )) |
+    (childteen=='C' & ( is.na(m5g18) & (is.na(n5f18)) )) |
       (childteen=='T' & is.na(p6h77))~ 'Missing', 
-    childteen=='C' & (m5g18=='-6 Skip' & (n5f18 %in% c('-7 N/A', "-6 Skip")))|
+    childteen=='C' & ((m5g17=='2 no' & n5f17 %in% c(NA_character_, '2 no')) | (n5f17=='2 no' & m5g17%in%c('2 no', NA_character_)))|
     childteen=='T' & p6h77=='-6 Skip'~ 'No smoking'))
-
+#throws NA warning because of as.numeric in these statements - 
+if(myFF%>%filter(is.na(SmkAtVisitPastmonth))%>%nrow()!=0){stop('NA in SmkAtVisitPastmonth')}
 #######################complete case dataset###################################
 
 
-#######################multiple imputation dataset###################################
-#this should be its ownscript after joining in methylation data 
- 

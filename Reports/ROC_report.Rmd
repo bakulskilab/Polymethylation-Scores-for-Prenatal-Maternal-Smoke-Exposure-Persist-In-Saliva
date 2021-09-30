@@ -22,6 +22,9 @@ global_roc%>%dplyr::select(covariates, methylation, childteen, test)%>%unnest(te
   facet_grid(childteen~methylation, labeller=labeller(childteen=age_labels, methylation=outcome_labels))+
   theme_classic()+theme(legend.position = 'bottom')+guides(color=guide_legend(nrow=6,byrow=TRUE))+
   geom_abline(intercept=1, slope=-1, color='black')
+```
+
+```{r}
 
 #is prediction better when using PMS? 
 global_roc%>%dplyr::select(predictors, covariates, methylation, childteen, test)%>%
@@ -34,6 +37,9 @@ global_roc%>%dplyr::select(predictors, covariates, methylation, childteen, test)
   scale_color_discrete(labels=outcome_labels)+
   theme_classic()+theme(legend.position = 'right')+guides(color=guide_legend(nrow=4,byrow=TRUE))+
   geom_abline(intercept=1, slope=-1, color='black')
+```
+
+```{r}
 
 global_roc%>%dplyr::select(predictors, covariates, methylation, childteen, test)%>%
   mutate(modeltype=ifelse(str_detect(predictors, '\\+'), covariates, 'No covariates'))%>%
@@ -46,7 +52,9 @@ global_roc%>%dplyr::select(predictors, covariates, methylation, childteen, test)
   theme_classic()+theme(legend.position = 'right')+guides(color=guide_legend(nrow=4,byrow=TRUE))+
   geom_abline(intercept=1, slope=-1, color='black')
 
+```
 
+```{r}
 #is best methylation predictor consistent across ancestries
 local_roc %>% dplyr::select(covariates, predictors, childteen, ancestry, test)%>%unnest(test)%>% 
   filter(str_detect(predictors, 'SSnewbornCT|cg055|global|pediatric') & covariates=='')%>%
@@ -58,7 +66,9 @@ local_roc %>% dplyr::select(covariates, predictors, childteen, ancestry, test)%>
   filter(str_detect(predictors, 'SSnewbornCT|cg055|global|pediatric') & covariates!='')%>%
   ggplot(aes(x=spec, y=sens, color=predictors))+
   facet_grid(childteen~ancestry)+geom_line()
+```
 
+```{r}
 #investigated change in ROC when adding in each base model var individually
 local_roc_test%>% dplyr::select(covariates, predictors, childteen, ancestry, test)%>%unnest(test)%>% 
   filter(str_detect(predictors, 'global'))%>%
@@ -68,6 +78,9 @@ local_roc_test%>% dplyr::select(covariates, predictors, childteen, ancestry, tes
 #big jump in ROC curve for European - poverty and hispanic - local pcs
 modeldata %>%filter(ancestry=='Hispanic ancestry' & childteen=='T')%>%xtabs(~Sample_Plate+smkPreg_binary, data=.)
 
+```
+
+```{r}
 #is prediction improved when using two time points? 
 
 global_roc%>%dplyr::select(covariates, methylation, childteen, test)%>%unnest(test) %>% 

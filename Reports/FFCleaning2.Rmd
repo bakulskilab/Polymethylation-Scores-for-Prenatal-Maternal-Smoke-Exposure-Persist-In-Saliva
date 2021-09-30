@@ -588,6 +588,7 @@ celltype_labels<-c('Epithelial cells', 'Fibroblasts', 'Immune cells'); names(cel
 
 ggplot(cellbytime, aes(x=childteen, y=Proportion, color=childteen))+geom_violin()+geom_boxplot(width=0.2)+facet_wrap(~Celltype, labeller=labeller(Celltype=celltype_labels))+stat_compare_means(label="..p.signif..")+ggtitle("Cell type proportions by visit")+theme_classic()+scale_color_discrete(name='Visit', labels=c('Age 9', 'Age 15'))+scale_x_discrete(name='Visit', labels=c('Age 9', 'Age 15'))+theme_classic()
 ```
+
 ```{r celltypes by visit spaghetti}
 cairo_ps(file.path(outputdir, 'SpaghettiCellTypes.ps'))
 ggplot(cellbytime, aes(x=childteen, y=Proportion, group=idnum))+geom_point()+geom_line(alpha=0.1, color='grey')+geom_smooth(aes(group=1), method='lm', fill='blue')+facet_wrap(~Celltype, labeller=labeller(Celltype=celltype_labels))+theme_classic()+scale_x_discrete('', labels=c('Age 9', 'Age 15'))+ylab('Proportion')+theme(text=element_text(size=16))
