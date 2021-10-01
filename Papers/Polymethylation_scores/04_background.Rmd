@@ -1,1 +1,13 @@
 # Background
+
+P1: Maternal prenatal smoking is a public health concern but measuring prenatal maternal smoking behavior is challenging. Developing an in vitro biomarker for prenatal smoke exposure would be beneficial for personalized medicine.  
+
+P2: DNA methylation could provide a reliable and specific biomarker of prenatal maternal smoke exposure. Cordblood and peripheral blood DNA methylation has been significantly associated with prenatal maternal smoking. **Gap**: Most previous studies have used blood samples, but saliva is an easier to collect tissue. To our knowledge, no study has measured associations between prenatal maternal smoking and DNA methylation in saliva samples.  
+
+P3: DNA methylation has been associated with prenatal maternal smoking at various cross-sectional time points across the life course. Ideally, a biomarker of a prenatal exposure would persist across the life course. **Gap**: Few studies have compared the effectiveness of DNA methylation as biomarker of prenatal maternal smoking in the same individuals at different times.  
+
+P4: DNA methylation has been well replicated in primarily European ancestry cohorts. The performance of other biomarkers and risk scores varies across ancestry groups. To be applied clinically without exacerbating health disparities, it is important to understand how the perfomance of biomarkers vary across ancestry groups. **Gap**: Yet few (no?) studies have compared associations of prenatal maternal smoking across diffferent ancestry groups.
+
+P5: Choice of how to construct a DNA methylation based biomarker. 
+
+P6: To translate DNA methylation to a *in vitro* biomarker for prenatal exposures, we must understand how performance [check with kelly if ok to use this word here now that have ROC plots] varies across tissue, age and ancestry. **To address these gaps we used XXXX longitudinal saliva samples from 9 and 14 year old children enrolled in a  diverse US birth cohort to test associations between DNA methylation summary measures and prenatal maternal smoke exposure.**  We found that maternal prenatal smoking was significantly associated with polymethylation scores. This association was persistent across time-point and consistent across ancestry strata. Polymethylation scores outperformed other non-target methylation summary measures, including global methylation and methylation clocks, as well as individual, *a priori* selected CpG sites. Our results suggest that polymethylation scores can serve as a persistent and consistent biomarker of prenatal smoke exposure.    
