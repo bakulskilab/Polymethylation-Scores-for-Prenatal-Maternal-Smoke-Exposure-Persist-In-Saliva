@@ -1,8 +1,9 @@
 #directory based coding
 datadir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/"
-john_datadir<-"/nfs/turbo/bakulski1/People/johndou/Fragile_Families/ProcessedFiles/jd"
-outputdir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Output/"
 codedir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Code/"
+
+####################################################################source functions
+source(file.path(codedir, 'UsefulCode', 'makePolyEpiScores.R'))
 
 #######################################chose apriori cpgs, if any
 aprioriCG<-c("cg05575921", "cg04180046", "cg05549655", "cg14179389")

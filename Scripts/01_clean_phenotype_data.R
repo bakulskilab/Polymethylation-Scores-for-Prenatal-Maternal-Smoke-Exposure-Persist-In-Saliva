@@ -90,9 +90,9 @@ FF_labeled=FF_labeled %>%
   mutate(across(c('m1g2', 'm1g3'), 
                 ~case_when(.x=='5 Never'~'No', is.na(.x)~ NA_character_, TRUE ~ 'Yes'), 
                 .names="{.col}_YesNoPreg"))%>%
-  mutate(PostnatalMaternalSmokingAny=case_when(m2j5=='1 Yes' | m4j18=='Yes'~ 'Maternal smoking at age 1 or age 5', 
-                                               is.na(m2j5) | is.na(m4j18) ~ 'Missing', 
-                                               m2j5 == '2 No' & m4j18=='2 No' ~ 'No maternal smoking at age 1 and 5'), 
+  mutate(PostnatalMaternalSmokingAny=case_when(m2j5 == '2 No' & m4j18=='2 No' ~ 'No maternal smoking at age 1 and 5',
+                                               m2j5=='1 Yes' | m4j18=='1 Yes'~ 'Maternal smoking at age 1 or age 5',
+                                               (is.na(m2j5) | m2j5=='2 No') & (is.na(m4j18) | m4j18=='2 No') ~ 'Missing'), 
          PostnatalMaternalSmokingDose=case_when(m2j5a %in% c("2 1pk/d", "3 1.5pk/d", "4 2pk/d", "5 >2pk/d") |
                                                 m4j19 %in% c("2 About pack/day", "3 Pack and half/day", "4 2 packs/day", "5 More 2 packs/day")~
                                                   'Pack/day or greater when child aged 1 or 5', 
@@ -143,8 +143,31 @@ myFF<-myFF %>%
       (childteen=='T' & is.na(p6h77))~ 'Missing', 
     childteen=='C' & ((m5g17=='2 no' & n5f17 %in% c(NA_character_, '2 no')) | (n5f17=='2 no' & m5g17%in%c('2 no', NA_character_)))|
     childteen=='T' & p6h77=='-6 Skip'~ 'No smoking'))
-#throws NA warning because of as.numeric in these statements - 
+#throws NA warning because of as.numeric in these statements - sow rite a check to make sure there aren't NAs here 
 if(myFF%>%filter(is.na(SmkAtVisitPastmonth))%>%nrow()!=0){stop('NA in SmkAtVisitPastmonth')}
+
 #######################complete case dataset###################################
 
+methylCohort<-pdqc_all %>% filter(childteen!='M')
 
+basemodelvar<-c("smkPreg_binary", "ancestry", "cm1bsex", "cm1inpov", "ChildAgeComposite")
+basemodeldata<-myFF %>% filter_at(all_of(basemodelvar), all_vars(!(. %in%c("Missing", "Missing PC data"))& !is.na(.)))
+
+prenatalexposurevar<-c(basemodelvar, "m1g2_YesNoPreg", "m1g3_YesNoPreg")
+prenatalexdata<-basemodeldata %>%filter_at(all_of(prenatalexposurevar), all_vars(!(. %in% c("Missing")) & !is.na(.)))
+
+secondhandsmokevars<-c(prenatalexposurevar, "PostnatalMaternalSmokingAny", "SmkAtVisitPastmonth")
+secondhandsmkdata<-prenatalexdata%>%filter_at(all_of(secondhandsmokevars), all_vars(!(. %in% c("Missing")) & !is.na(.)))
+
+child_smoke<-secondhandsmkdata %>% filter(k5f1l!= "2 no" & childteen=='C')
+child_nosmoke<-secondhandsmkdata %>% filter(k5f1l=="2 no" & childteen=='C')
+teen_smoke<-secondhandsmkdata %>% filter(k6d40!="2 No" & childteen=='T')
+teen_nosmoke<-secondhandsmkdata %>% filter(k6d40=="2 No" & childteen=='T')
+completecase<-rbind(child_nosmoke, teen_nosmoke)
+
+fathersmkdata<-completecase %>% filter(f1g4!="Missing" & !is.na(f1g4))
+
+#####################################################################################Save all data 
+save(file=paste0(datadir, '/CreatedData/allPhenoData.Rdata'))
+#####################################################################################Save my specific data for modeling
+save(completecase, file=paste0(datadir, '/CreatedData/completeCasepheno.Rdata'))
