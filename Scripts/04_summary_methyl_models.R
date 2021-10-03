@@ -26,14 +26,15 @@ library(sva)
 #############
 #investigate why clocks have 1 fewer observation in child models
 ##################################Directories & data
-data.dir="/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/CreatedData"
+datadir="/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/CreatedData"
 outputdir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Output"
 #read data 
-load(paste0(datadir, '/CreatedData/completeCasemethyl.Rdata'))
+load(paste0(datadir, '/completeCasemethyl.Rdata'))
+modeldata=completecase%>%droplevels()
 
 #set as factors 
 modeldata$PostnatalMaternalSmokingAny<-factor(modeldata$PostnatalMaternalSmokingAny, 
-                                              levels=c("No maternal smoking at age 1 and age 5", 
+                                              levels=c("No maternal smoking at age 1 and 5", 
                                                        "Maternal smoking at age 1 or age 5"))
 modeldata$SmkAtVisitPastmonth<-factor(modeldata$SmkAtVisitPastmonth, 
                                       levels=c("No smoking", 
@@ -43,15 +44,15 @@ modeldata$slide<-factor(modeldata$slide)
 modeldata$Sample_Plate<-factor(modeldata$Sample_Plate)
 
 #sv data - no variance filter, whole subset
-load(paste0(data.dir, '/svNone.Rds'))
+load(paste0(datadir, '/svNone.Rds'))
 is_sv=function(x) str_replace_all(x, " ", "")
 sv.vNone=sv.vNone%>%rename_with(is_sv, contains('sv'))
 modeldata=left_join(modeldata, sv.vNone)
 
 #################################Set variables for modeling
 #outcomes & outcome_labels
-y_vector<-c("globalmethylation", "pediatric", "grim", "anynewborn_center", "SSnewbornCT_center", "SSolder_center", "cg05575921")
-outcome_labels=c('Global methylation', 'Pediatric clock', 'GRIM clock',  
+y_vector<-c("globalmethylation", "pediatric", "anynewborn_center", "SSnewbornCT_center", "SSolder_center", "cg05575921")
+outcome_labels=c('Global methylation', 'Pediatric clock',  
                  'Any smoking polymethylation score (newborns)', 
                  'Sustained smoking polymethylation score (newborns, cell-type controlled)', 
                  'Sustained smoking polymethylation score (older children)', 
@@ -59,7 +60,7 @@ outcome_labels=c('Global methylation', 'Pediatric clock', 'GRIM clock',
 names(outcome_labels)=y_vector
 
 #model variables (excepting PCs, add in individually for global & ancestry specific models)
-base_model_vars<-"~smkPreg_binary+cm1bsex+cm1inpov+Epi+IC+Sample_Plate"
+base_model_vars<-"~smkPreg_binary+cm1bsex+cm1inpov+Leukocytes_saliva+Epithelial.cells_saliva+Sample_Plate"
 prenatal_model_vars<-paste0(base_model_vars, "+m1g2_YesNoPreg+m1g3_YesNoPreg")
 secondhand_model_vars<-paste0(prenatal_model_vars, '+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth')
 interaction_model_vars<-paste0(secondhand_model_vars, '+ChildAgeComposite:smkPreg_binary')
@@ -180,9 +181,10 @@ longitudinal_local_models=my_clean_argnames(longitudinal_local_models, local_pre
 ################################Reverse models for roc curve########################
  #add a numeric for yes/no smoking for logistic models
 modeldata=modeldata%>%mutate(smkPreg_binaryN=case_when(smkPreg_binary=='Yes'~1, smkPreg_binary=='No'~0))
+
 #global predictors, cross sectional
-global_predictors=c('', gsub('~smkPreg_binary', '', c(paste0(predictors, global_pcs), surrogate_model_vars)))
-args=list('childteen'=age_vector, 'methylation'=y_vector, 'covariates'=global_predictors)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))
+roc_predictors=gsub('~smkPreg_binary', '', paste0(base_model_vars, global_pcs))
+args=list('childteen'=age_vector, 'methylation'=c('', y_vector), 'covariates'=roc_predictors)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))
 
 
 global_roc=modeldata%>%
