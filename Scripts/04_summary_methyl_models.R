@@ -29,12 +29,8 @@ library(sva)
 data.dir="/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/CreatedData"
 outputdir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Output"
 #read data 
-file.path(data.dir, list.files(data.dir))[(str_detect(file.path(data.dir, list.files(data.dir)), 'NoSmk'))]%>%
-  map(load, envir=.GlobalEnv)
-#bind data
-modeldata<-rbind(child_nosmoke, teen_nosmoke)
-#label data 
-set_label(modeldata)<-get_label(child_nosmoke)
+load(paste0(datadir, '/CreatedData/completeCasemethyl.Rdata'))
+
 #set as factors 
 modeldata$PostnatalMaternalSmokingAny<-factor(modeldata$PostnatalMaternalSmokingAny, 
                                               levels=c("No maternal smoking at age 1 and age 5", 

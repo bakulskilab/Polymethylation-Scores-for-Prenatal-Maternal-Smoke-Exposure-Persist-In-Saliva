@@ -146,6 +146,16 @@ myFF<-myFF %>%
 #throws NA warning because of as.numeric in these statements - sow rite a check to make sure there aren't NAs here 
 if(myFF%>%filter(is.na(SmkAtVisitPastmonth))%>%nrow()!=0){stop('NA in SmkAtVisitPastmonth')}
 
+################################################################################add labels
+set_label(myFF)=c(get_label(myFF)[1:69], 'Has 450K Illumina chip data', 'Maternal prenatal smoking', 
+                  'Maternal prenatal alcohol use', 'Maternal prenatal any drug use', 
+                  'Any postnatal maternal smoking when child age 1 or 5', 'Postnatal maternal smoking dose when child age 1 or 5', 
+                  'Ancestry categorization from child principal components of genetic data', 
+                  paste0('Within ancestry strata principal component', 1:20), 
+                  paste0('Within all samples principal component', 1:20), 
+                  'Methylation data ID', 'Visit', 'ID', 'Batch', 'Slide', 'Array', 
+                  'Child age at visit', 'Maternal/primary care giver smoking in month prior to visit (pks/day)')
+
 #######################complete case dataset###################################
 
 methylCohort<-pdqc_all %>% filter(childteen!='M')
@@ -163,11 +173,14 @@ child_smoke<-secondhandsmkdata %>% filter(k5f1l!= "2 no" & childteen=='C')
 child_nosmoke<-secondhandsmkdata %>% filter(k5f1l=="2 no" & childteen=='C')
 teen_smoke<-secondhandsmkdata %>% filter(k6d40!="2 No" & childteen=='T')
 teen_nosmoke<-secondhandsmkdata %>% filter(k6d40=="2 No" & childteen=='T')
-completecase<-rbind(child_nosmoke, teen_nosmoke)
+completecase<-rbind(child_nosmoke, teen_nosmoke)%>%copy_labels(basemodeldata)%>%copy_labels(myFF)
 
 fathersmkdata<-completecase %>% filter(f1g4!="Missing" & !is.na(f1g4))
 
+
+
+
 #####################################################################################Save all data 
-save(file=paste0(datadir, '/CreatedData/allPhenoData.Rdata'))
+save.image(file=paste0(datadir, '/CreatedData/allPhenoData.Rdata'))
 #####################################################################################Save my specific data for modeling
 save(completecase, file=paste0(datadir, '/CreatedData/completeCasepheno.Rdata'))
