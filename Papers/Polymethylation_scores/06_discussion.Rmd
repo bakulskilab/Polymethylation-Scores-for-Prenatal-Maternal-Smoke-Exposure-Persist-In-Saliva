@@ -2,10 +2,25 @@
 
 Restate findings
 
-How are results similar or different to other results 
+How do findings fit with previous literature: 
+- Performance was worse than the performance of biomarkers using cord blood (AUC: 0.82-0.97), but comparable to performance of biomarkers using peripheral blood (AUC 0.72... NOTE: I don't think this was adjusted for anything else, i.e. if any other predictors were included in the model--if not, then ours is worse). 
 
-Tissue 
+What does our study add: 
 
-Age 
 
-Ancestry 
+Strengths: 
+
+- Large sample size and longitudinal measures 
+
+- 
+
+
+Limitations: 
+
+- Available coefficients for construction of scores were from blood, primarily European ancestry meta-analysis
+
+- Used maternal self report as opposed to serum cotinine levels as exposure measurement - exposure misclassification/information bias
+
+- Possibility for selection bias into cohort due to live birth bias 
+
+- Residual confounding is always possible. 
