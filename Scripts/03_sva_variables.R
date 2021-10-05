@@ -12,10 +12,11 @@ data.dir="/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/"
 output.dir=paste0(data.dir, 'CreatedData/')
 
 #load in betaqc matrix
-betaqc<-readRDS(file=paste0(data.dir, 'OGData/', "noob_filtered.rds"))
-file.path(paste0(data.dir, 'CreatedData/'), list.files(paste0(data.dir, 'CreatedData/')))[(str_detect(file.path(paste0(data.dir, 'CreatedData/'), list.files(paste0(data.dir, 'CreatedData/'))), 'NoSmk'))]%>%map(load, envir=.GlobalEnv)
+#as of october 4 switched to beta file with  423668 probes (see Jonah email search Check in on sex filtration/clocks Fragile Families)
+betaqc<-readRDS(file=paste0(data.dir, 'OGData/', "betaqc.rds"))
 
-pheno<-rbind(child_nosmoke, teen_nosmoke) # dataset with the most exclusion i.e. squaring dataset off for all models (excluding kids who smoke in figure)
+load(paste0(datadir, '/CreatedData/completeCasepheno.Rdata'))
+pheno<-completecase # dataset with the most exclusion i.e. squaring dataset off for all models (excluding kids who smoke in figure)
 
 #make a matrix of model data 
 #filter beta matrix to only those in analytic subset 

@@ -184,8 +184,7 @@ modeldata=modeldata%>%mutate(smkPreg_binaryN=case_when(smkPreg_binary=='Yes'~1, 
 
 #global predictors, cross sectional
 roc_predictors=gsub('~smkPreg_binary', '', paste0(base_model_vars, global_pcs))
-args=list('childteen'=age_vector, 'methylation'=c('', y_vector), 'covariates'=roc_predictors)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))
-
+args=list('childteen'=age_vector, 'methylation'=c('', y_vector, 'cg05549655'), 'covariates'=roc_predictors)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))
 
 global_roc=modeldata%>%
   group_by(childteen)%>%nest()%>%left_join(args)%>%
@@ -196,23 +195,11 @@ global_roc=modeldata%>%
          test=map(roc, ~data.frame('sens'=.x$sensitivities, spec=.x$specificities)))
 
 #local predictors, crosssectional 
-local_predictors=c('', gsub('~smkPreg_binary', '', c(paste0(predictors, local_pcs), surrogate_model_vars)))
-args=list('childteen'=age_vector, 'methylation'=y_vector, 'covariates'=local_predictors[1:2])%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))
+roc_predictors=gsub('~smkPreg_binary', '', paste0(base_model_vars, local_pcs))
+args=list('childteen'=age_vector, 'methylation'=c('', y_vector), 'covariates'=roc_predictors)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))
 
 
 local_roc=modeldata%>%group_by(childteen, ancestry)%>%nest()%>%left_join(args)%>%
-  mutate(model=pmap(list(data, 'smkPreg_binaryN~', predictors), model_reversed), 
-         tidied=map(model, tidy, conf.int=T), 
-         augmented=map(model, augment, type.predict = "response"), 
-         roc=map(augmented, ~roc(.x$smkPreg_binaryN, .x$.fitted)), 
-         test=map(roc, ~data.frame('sens'=.x$sensitivities, spec=.x$specificities)))
-
-
-#investigation 
-predictors_test=c(paste0('+', str_split(base_model_vars, '\\+')[[1]][-1]), local_pcs, '')
-args=list('childteen'=age_vector, 'methylation'=y_vector, 'covariates'=predictors_test)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))
-
-local_roc_test=modeldata%>%group_by(childteen, ancestry)%>%nest()%>%left_join(args)%>%
   mutate(model=pmap(list(data, 'smkPreg_binaryN~', predictors), model_reversed), 
          tidied=map(model, tidy, conf.int=T), 
          augmented=map(model, augment, type.predict = "response"), 
@@ -225,10 +212,10 @@ modeldata_wide = modeldata%>%
                          'global_PC2', 'local_PC1', 'local_PC2', 
                          'smkPreg_binaryN',  y_vector, 
                          str_split(secondhand_model_vars,  '\\+')[[1]][-1])))%>%
-  pivot_wider(names_from = childteen, values_from=any_of(c(y_vector, 'Epi', 'IC', 'Sample_Plate', 'SmkAtVisitPastmonth')))
+  pivot_wider(names_from = childteen, values_from=any_of(c(y_vector, 'Leukocytes_saliva', 'Epithelial.cells_saliva', 'Sample_Plate', 'SmkAtVisitPastmonth')))
 
 #arguments
-long_predictors=c('', '+cm1bsex+cm1inpov+global_PC1+global_PC2+Epi_C+IC_C+Sample_Plate_C+Epi_T+IC_T+Sample_Plate_T')
+long_predictors=c('', '+cm1bsex+cm1inpov+global_PC1+global_PC2+Leukocytes_saliva_C+Epithelial.cells_saliva_C+Sample_Plate_C+Leukocytes_saliva_T+Epithelial.cells_saliva_T+Sample_Plate_T')
 args=list('methylation'=paste0(y_vector, '_C+', y_vector, '_T') , 'covariates'=long_predictors)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))
 
 long_global_roc=args %>% 

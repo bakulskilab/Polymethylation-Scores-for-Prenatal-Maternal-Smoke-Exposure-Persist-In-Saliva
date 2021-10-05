@@ -6,12 +6,11 @@ library(tidyr)
 library(stringr)
 library(dplyr)
 library(purrr)
-library(tidyselect)
+library(tidydplyr::select)
 library(sjlabelled)
 
 #directory based coding
 datadir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/"
-john_datadir<-"/nfs/turbo/bakulski1/People/johndou/Fragile_Families/ProcessedFiles/jd"
 outputdir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Output/"
 codedir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Code/"
 
@@ -37,7 +36,7 @@ FF_factors=FFmeta%>%
 #recode binary, categorical variables so they have label names as values (nicer for table and plotting)
 pheno=pheno %>% dplyr::mutate(across(any_of(FF_factors), ~sjlabelled::as_label(., drop.levels=TRUE)))
 
-#select variables
+#dplyr::select variables
 idvars<-c("id", "ff_id")
 demovars<-c("cm1age", "cm1bsex", "cm1ethrace", "cm1edu", "cm1hhinc", "cm1inpov", "m1h3", "m1h3a", "m1h3b", "m1i4", "m1i4a", "m1i4b", "cf1age", "cf1ethrace", "f1h3", "f1h3a", "f1h3b", "ch5agem","ch6yagem", "c6yagey", "cm5b_age", "cm5b_ageyrs", "cp6yagem", "cp6yagey", "hv5_agem", "hv6_yagem", "hv6_yagey")
 smokingvars<-c("m1g4", "f1g4", "f2j5", "f2j5a", "f2j7", "f2j7a", "f3j31", "f3j32", "f4j18", "f4j19", "f5g17", "f5g18", "k5f1k", "k5f1l", "k6d40", "k6d41", "k6d41", "k6d42", "k6d43", "k6d45", "k6d46", "k6d47", "m2j5", "m2j5a", "m2j7", "m2j7a", "m4j18", "m4j19", "m5g17", "m5g18", "n5f17", "n5f18", "p3a22", "p3a23", "p3a23a", "p3a23b", "p3a24", "p4a22", "p4a23", "p5h15", "p5h15b", "p5q3cr", "p6h74", "p6h75", "p6h76", "p6h77", "p6h78")
@@ -45,7 +44,6 @@ prenataldrugusevar<-c("m1g2", "m1g3", "m1g5", "m1g6")
 FF_labeled=pheno %>%dplyr::select(any_of(c(idvars, demovars, smokingvars, prenataldrugusevar)))
 #apply NA codes
 my_na_codes<-c(-10:-1, "-1 Refuse", "-2 Don't know", "-3 Missing", "-9 Not in wave", "-7 N/A")
-my_na_codes_numeric=
 na_codes <- function(x, ...) {
   x[x %in% c(...)] <- NA
   if(is.factor(x)==TRUE){x<-droplevels(x)}
@@ -55,11 +53,24 @@ FF_labeled=FF_labeled%>%mutate(across(everything(), ~na_codes(., my_na_codes)))%
 
 ############################pdqc data######################################
 
-#Note as of september 24, 2021, check with Jonah about final analytic subset sex outliers etc
+#As of October 4 added in the 9 sex incorrect at birth samples (see Jonah email search Check in on sex filtration/clocks Fragile Families)
+#removed 3 sex outlier samples to bring sample size in line w/ air pollution paper 1745 observations
 pdqc_all<-readRDS(paste0(datadir, 'OGData/', "pd_qc.rds"))
-#filter samples w/ >10 probe fail or sex !=predicted sex
+airpollution_study<-read.csv(paste0(datadir, 'OGData/', 'isee_pollutionpegs_newvars_5.6.2021.csv'))
+IDsNotInAir=pdqc_all$MethID[!(pdqc_all$MethID %in% airpollution_study$MethID)]
+IDsNotInAir= pdqc_all %>%filter(MethID %in% IDsNotInAir)
+childIDNotInAir=IDsNotInAir%>%filter(childteen!='M')
+#figure out samples w/ incorrect sex at birth variable 
+pdqc_all = pdqc_all %>% left_join(airpollution_study %>% 
+                                    mutate(idnum=as.character(idnum), sex_new=sex)%>% 
+                                    dplyr::select(idnum, MethID, childteen, sex_new))%>%
+   mutate(sex_flag=ifelse(sex!=sex_new, 'recode_sex', 'correct_sex'))
+sex_recodes=pdqc_all %>% filter(sex_flag=='recode_sex')%>%pull(idnum)
+#check
+#with(pdqc_all, table(sex_new, cm1bsex))
+#filter samples w/ >10 probe fail or sex !=predicted sex or sex outlier or mother sample 
 pdqc<-pdqc_all %>% 
-  filter(probe_fail_10==0 & sex==predicted_sex)%>%
+  filter(probe_fail_10==0 & sex_new==predicted_sex & pdqc_all$predicted_sex_outlier==FALSE & childteen!='M')%>%
   #add a new id for identifying technical replicates
   mutate(newID=paste(idnum, childteen, sep='_'))
 
@@ -68,8 +79,8 @@ reps_remove=pdqc%>%group_by(newID)%>%filter(n()>1)%>% #filter to technical repli
   filter(probe_fail_pct==max(probe_fail_pct))%>% #filter to high pct probe fail
   pull(MethID)
 
-#remove replicates with a higher pct probe failure & any samples identified as mother ids
-pdqc_clean<-pdqc %>% filter(!(MethID %in% reps_remove) & childteen!='M')
+#remove replicates with a higher pct probe failure 
+pdqc_clean<-pdqc %>% filter(!(MethID %in% reps_remove))
 
 #add batch, slide and plate data
 batchData<-read.csv(file.path(datadir, 'Methylation_450K_array_batch_information.csv'))
@@ -99,7 +110,11 @@ FF_labeled=FF_labeled %>%
                                                 m2j5a %in% c("1 <1/2 pk/d") | 
                                                 m4j19 %in% c("1 Less half pack/day")~
                                                   "Less than pack/d when child aged 1 or 5", 
-                                                m2j5a=='-6 Skip' & m4j19== '-6 Skip'~'No smoking when child age 1 or 5' ))%>%copy_labels(., FF_labeled)
+                                                m2j5a=='-6 Skip' & m4j19== '-6 Skip'~'No smoking when child age 1 or 5' ), 
+         cm1bsex=factor(case_when(id %in% sex_recodes & cm1bsex=='1 Boy'~'2 Girl', 
+                                  id %in% sex_recodes & cm1bsex=='2 Girl'~'1 Boy', 
+                                  TRUE ~ as.character(cm1bsex))))%>%
+  copy_labels(., FF_labeled)
 
 #ancestry
 #read in local and global pc data
@@ -109,23 +124,24 @@ localpc=pc_files%>%map_dfr(read.csv, .id='ancestry')%>%rename_with(~str_c('local
 allPC<-read.table(paste0(datadir, "OGData/pcs/global_pcs.txt"), col.names=c("X", "idnum", paste("global_PC", 1:20, sep='')))
 
 #individuals in each ancestry specific pc group can be labeled as that ancestry for categorical ancestry variable 
-FF_labeled=FF_labeled %>% left_join(localpc%>%mutate(id=as.character(idnum))%>%select(id, ancestry, contains('local_PC')))%>%
-  left_join(allPC%>%mutate(id=as.character(idnum))%>%select(id, contains('global_PC')))%>%
+FF_labeled=FF_labeled %>% left_join(localpc%>%mutate(id=as.character(idnum))%>%dplyr::select(id, ancestry, contains('local_PC')))%>%
+  left_join(allPC%>%mutate(id=as.character(idnum))%>%dplyr::select(id, contains('global_PC')))%>%
   mutate(ancestry=case_when(is.na(ancestry) & is.na(global_PC1) & Methyldata=='Analysis subset' ~'Missing PC data',
                             is.na(ancestry) & Methyldata!='Analysis subset'~'Not in analysis subset',
                             !is.na(ancestry)~ancestry))%>%copy_labels(., FF_labeled)
 
-MissingPCdata<-FF_labeled %>% filter(ancestry=="Missing PC data")%>%select(id)
+MissingPCdata<-FF_labeled %>% filter(ancestry=="Missing PC data")%>%dplyr::select(id)
 save(MissingPCdata, file = paste0(datadir, "CreatedData/MissingPC.Rdata"))
 
 #######################filter to analysis subset and join with pdqc###################################
 myFF=FF_labeled%>%filter(Methyldata=='Analysis subset')%>%
   left_join(pdqc_clean%>% 
-              select(MethID, childteen, idnum, Sample_Plate, Slide, Array)%>%
+              dplyr::select(MethID, childteen, idnum, Sample_Plate, Slide, Array, sex_new, sex_flag)%>%
               mutate(id=as.character(idnum)))%>%
   copy_labels(., FF_labeled)
 
-
+#check sex recodes
+#myFF%>% filter(sex_flag=='recode_sex')%>% xtabs(~cm1bsex+sex_new, data=.)
 #######################make visit specific variables###################################
 #child age
 #mom/pgc smoking amount past month
@@ -153,7 +169,8 @@ set_label(myFF)=c(get_label(myFF)[1:69], 'Has 450K Illumina chip data', 'Materna
                   'Ancestry categorization from child principal components of genetic data', 
                   paste0('Within ancestry strata principal component', 1:20), 
                   paste0('Within all samples principal component', 1:20), 
-                  'Methylation data ID', 'Visit', 'ID', 'Batch', 'Slide', 'Array', 
+                  'Methylation data ID', 'Visit', 'ID', 'Batch', 'Slide', 'Array',
+                  'sex_fromjonah', 'sex recode flag',
                   'Child age at visit', 'Maternal/primary care giver smoking in month prior to visit (pks/day)')
 
 #######################complete case dataset###################################
@@ -184,3 +201,4 @@ fathersmkdata<-completecase %>% filter(f1g4!="Missing" & !is.na(f1g4))
 save.image(file=paste0(datadir, '/CreatedData/allPhenoData.Rdata'))
 #####################################################################################Save my specific data for modeling
 save(completecase, file=paste0(datadir, '/CreatedData/completeCasepheno.Rdata'))
+

@@ -3,7 +3,7 @@ datadir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/"
 codedir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Code/"
 clock_coefs="/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/OGData/clock_coefs/"
 
-####################################################################source functionslibrary
+####################################################################library
 library(dplyr)
 library(EpiDISH)
 library(ewastools)
@@ -21,8 +21,9 @@ source(file.path(codedir, 'UsefulCode', 'makePolyEpiScores.R'))
 aprioriCG<-c("cg05575921", "cg04180046", "cg05549655", "cg14179389")
 
 ################################read in methylation data
-betaqc<-readRDS(file=paste0(datadir, 'OGData/', "noob_filtered.rds"))
-
+#as of october 4 switched to beta file with  423668 probes (see Jonah email search Check in on sex filtration/clocks Fragile Families)
+betaqc<-readRDS(file=paste0(datadir, 'OGData/', "betaqc.rds"))
+if(nrow(betaqc)!=423668){stop("Probe number not what thought, stop and check betaqc")}
 ###########################################cell type proportions 
 celltypes<-epidish(beta.m = betaqc, ref.m = centEpiFibIC.m, method = "RPC")
 #RPC method w/ centEpiFibIC
@@ -38,7 +39,7 @@ cell_types=left_join(estF_FF, estL_FF)
 
 ################################################global methylation
 globalmethy<-colMeans(betaqc, na.rm=T)
-globalmethdf<-as.data.frame(cbind("MethID"=names(globalmethy), "globalmethylation"=globalmethy))
+globalmethdf<-data.frame("MethID"=names(globalmethy), "globalmethylation"=globalmethy)
 
 #################################################apriori cpgs
 aprioriCGdf<-as.data.frame(t(betaqc[aprioriCG, ]))
@@ -67,22 +68,20 @@ scores_center=makePolyEpiScore(m=betaqc, b=cpgs, transformopt = 'meancenter')
 polyscores=list('notransform'=scores, 'zscore'=scores_z, 'center'=scores_center)
 polyscores<-lapply(polyscores, function(x) x%>% mutate(MethID=colnames(betaqc)))
 save(polyscores, file = file.path(datadir, 'CreatedData', 'polymethylationscores.RDS'))
-polyscores_wide<-lapply(seq_along(polyscores), function(i) polyscores[[i]] %>% setNames(c(paste0(colnames(polyscores[[i]])[1:4], '_', names(polyscores)[i]), 'MethID')))%>%reduce(left_join, by='MethID')
+polyscores_wide<-lapply(seq_along(polyscores), function(i) polyscores[[i]] %>% setNames(c(paste0(colnames(polyscores[[i]])[1:4], '_', names(polyscores)[i]), 'MethID')))%>%purrr::reduce(left_join, by='MethID')
 
 #################################################epigenetic clocks
 ###################THIS NEEDS TO BE CHANGED -- clocks weren't calculated on johns betaqc but on jonahs, 
 #have different probe filter/sample filter sets
 #I've been working with Johns betaqc but using jonahs clocks. 
-#clocks<-read.csv(file=paste0(datadir, "OGData/ffcw_n1776_8clocks.csv"), header = T)
-#colnames(clocks)[1]<-"MethID"
-#Note that there are 3 IDS missing here from Jonah's clocks because of the sex filtration step 
-#i.e. John dropped sex discordant pairs, jonah dropped sex outliers. so there wer 3 sex outliers here in 
-#johns betaqc that weren't in jonahs. But I think all these clocks need to be rerun 
-#since they were created using jonahs betaqc but I have calculated the pms, sva & the global methylation 
-#using johns betaqc 
-#options: either recalculate the clocks using johns betaqc or switch back to jonahs betaqc, fitler out discordant pairs and use 
-#that only 
-#pdqc 
+if(nrow(betaqc)==423668){
+  clocks<-read.csv(file=paste0(datadir, "OGData/ffcw_n1776_8clocks.csv"), header = T)
+  colnames(clocks)[1]<-"MethID"
+}
+#the below code will run if the # CpGs in your chosen CpG matrix isn't 423668 (see note at top re: Jonah email) as the clocks
+#from ffcw_n1776_8clocks.csv were run using the 423668 matrix. if you switch to some other beta matrix, this code will recreate 
+# the clocks for you, except levine and GRIM clock which requires different code. 
+if(nrow(betaqc)!=423668){
 pdqc_all<-readRDS(paste0(datadir, 'OGData/', "pd_qc.rds"))
 pd <- data.table(pdqc_all%>%filter(MethID %in% colnames(betaqc)))[, .(MethID, idnum, childteen)]
 if(ncol(betaqc)!=nrow(pd)){stop('Observations not equivalent')}
@@ -100,27 +99,41 @@ names(pedc) <- ped[, ID]
 pd[, pediatric := agep(betaqc, coeff = pedc)]
 #pace of aging 
 pd[, c("poam38", "poam45") := PoAmProjector(betaqc)]
-
+clocks=pd
+}
 ################################################join methyl data together 
 methyldata=left_join(cell_types, globalmethdf)%>%
   left_join(aprioriCGdf)%>%
   left_join(polyscores_wide)%>%
-  left_join(pd)
-  #left_join(clocks)
+  left_join(clocks)
 
 ################################################labels 
+
 pms_labels=c('Polymethylation score: coefficients for any smoking from newborn cordblood meta-analysis (no transform)', 
              'Polymethylation score: coefficients for sustained smoking from newborn cordblood meta-analysis (no transform)', 
              'Polymethylation score: coefficients for sustained smoking from newborn cordblood meta-analysis, w/ cell-type control (no transform)', 
               'Polymethylation score: coeffcients for sustained smoking from older children peripheral blood meta-analysis (no transform)')
 
-set_label(methyldata)=c('Methylation data ID', 'Epithelial cell proportion', 'Fibroblast cel proportion', 'Immune cell proportion',
-                        'Leukocytes proportion (saliva)','Epithelial cell proportion (saliva)', 
-                        'Global methylation', 'AHHR: cg05575921', 'MYO1G: cg04180046', 'CYP1A1: cg05549655', 'GFI1: cg14179389', 
-                        pms_labels, gsub('no transform', 'z-score standardized', pms_labels), gsub('no transform', 'mean-centered', pms_labels), 
-                        'ID', 'Visit',
-                        'Horvath clock', 'SkinBlood clock', 'Pediatric clock', 'PoAm clock 38', 'PoAm clock 45')
+methyl_labels_myclocks=c('Methylation data ID', 'Epithelial cell proportion', 'Fibroblast cel proportion', 'Immune cell proportion',
+                         'Leukocytes proportion (saliva)','Epithelial cell proportion (saliva)', 
+                         'Global methylation', 'AHHR: cg05575921', 'MYO1G: cg04180046', 'CYP1A1: cg05549655', 'GFI1: cg14179389', 
+                         pms_labels, gsub('no transform', 'z-score standardized', pms_labels), gsub('no transform', 'mean-centered', pms_labels), 
+                         'ID', 'Visit',
+                         'Horvath clock', 'SkinBlood clock', 'Pediatric clock', 'PoAm clock 38', 'PoAm clock 45')
 
+methyl_labels_jonahclocks=c('Methylation data ID', 'Epithelial cell proportion', 'Fibroblast cel proportion', 'Immune cell proportion',
+                            'Leukocytes proportion (saliva)','Epithelial cell proportion (saliva)', 
+                            'Global methylation', 'AHHR: cg05575921', 'MYO1G: cg04180046', 'CYP1A1: cg05549655', 'GFI1: cg14179389', 
+                            pms_labels, gsub('no transform', 'z-score standardized', pms_labels), gsub('no transform', 'mean-centered', pms_labels), 
+                            'ID', 'Visit',
+                            'Horvath clock', 'SkinBlood clock', 'Hannum clock', 'Pediatric clock', 'Levine clock', 'PoAm clock 38', 'PoAm clock 45', 'GRIM clock')
+
+if(nrow(betaqc)==423668){
+  set_label(methyldata)=methyl_labels_jonahclocks
+}
+if(nrow(betaqc)!=423668){
+  set_label(methyldata)=methyl_labels_myclocks
+}
 
 #################################################checks
 summary(methyldata)
@@ -128,8 +141,9 @@ summary(methyldata)
 
 #load in complete case analysis
 load(paste0(datadir, '/CreatedData/completeCasepheno.Rdata'))
-completecase=left_join(completecase, methyldata)
+completecase=left_join(completecase, methyldata%>%mutate(idnum=as.character(idnum)))
 
 
 #################################################save 
+save(methyldata, file=paste0(datadir, '/CreatedData/allmethyl.Rdata'))
 save(completecase, file=paste0(datadir, '/CreatedData/completeCasemethyl.Rdata'))
