@@ -1,26 +1,39 @@
 # Discussion
 
-Restate findings
+P1 (restate findings): In this longitudinal birth cohort, we found an association between prenatal maternal smoking and salivary DNA methylation.
 
-How do findings fit with previous literature: 
-- Performance was worse than the performance of biomarkers using cord blood (AUC: 0.82-0.97), but comparable to performance of biomarkers using peripheral blood (AUC 0.72... NOTE: I don't think this was adjusted for anything else, i.e. if any other predictors were included in the model--if not, then ours is worse). 
+- Polymethylation scores were associated with prenatal maternal smoking across ages and ancestry while global methylation and epigenetic clocks were not. 
 
-What does our study add: 
+- Polymethylation scores had reasonable accuracy and accuracy was more consistent across time when using polymethylation scores than when using individual *a priori* CpG sites.  
 
+P2 (compares to previous findings): Our findings fit within the previous literature on DNA methylation as a possible biomarker of prenatal maternal smoking. 
 
-Strengths: 
+- {if including EWAS results: many top hits from previous EWAS analyses using blood samples were replicated} (joubert 2016).
 
-- Large sample size and longitudinal measures 
+- Fits well with previous findings of an association in cord and peripheral blood (Joubert 2016). Although no studies of prenatal maternal smoking and saliva methylation, own-smoking and DNA methylation association in saliva, including at cg05575921 (Philibert 2019, Long 2019). 
 
-- 
+- Performance was worse than the performance of biomarkers using cord blood (AUC: 0.82-0.97 from Fallin 2016 London 2017), but comparable to performance of biomarkers using peripheral blood (AUC 0.72, Davey Smith 2018... NOTE: I don't think this was adjusted for anything else, i.e.  other predictors were included in the model--so technically then ours is worse). 
 
+- For own smoking saliva DNA methylation at cg05575921 has been found to have a higher accuracy (in models incorporating age gender and methylations status) was 0.995 in blood, 0.971 in saliva, improved to 0.981 when incorporating another methylation marker of tissue heterogeneity [Philibert, Long 2019]
 
-Limitations: 
+P3 (what we add): We contribute to the translation of DNA methylation to a clinical biomarker by evaluating consistency across ages and ancestries. 
+
+- Even when polymethylation score coefficients were based on coefficients from a metaanalysis of primarily European ancestry, we found an association with prenatal maternal smoking. Effect estimates relatively consistent across ancestries 
+
+- AUC for polymethylation scores calculated using coefficients from models adjusting for cell-type better than those not adjusting for cell-type, cell-type control should be instituted both when creating weights and when applying scores to new population. 
+
+- AUC better for polymethylationn scores than cg055, and more consistent across ages. Better to incorporate multiple methylation sites than single methylation site? 
+
+P4 (limitations & strengths): 
 
 - Available coefficients for construction of scores were from blood, primarily European ancestry meta-analysis
 
-- Used maternal self report as opposed to serum cotinine levels as exposure measurement - exposure misclassification/information bias
+- Exposure measurement not ideal: Used maternal self report as opposed to serum cotinine levels as exposure measurement - exposure misclassification/information bias; any vs sustained smoking 
 
 - Possibility for selection bias into cohort due to live birth bias 
 
 - Residual confounding is always possible. 
+
+- Large sample size and longitudinal measures 
+
+

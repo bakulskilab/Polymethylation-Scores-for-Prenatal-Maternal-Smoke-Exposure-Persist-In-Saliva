@@ -2,7 +2,10 @@
 title: "Polymethylation scores paper"
 author: "F blostein"
 date: "9/13/2021"
-output: pdf_document
+output:
+  word_document: default
+  html_document:
+    df_print: paged
 bib: ../Methylation_SmokingBib.bib
 ---
 

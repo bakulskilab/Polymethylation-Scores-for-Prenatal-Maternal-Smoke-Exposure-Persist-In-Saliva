@@ -17,10 +17,10 @@ The Fragile Families and Child Wellbeing Study (FFCW) is a nationally-representa
 
 ## Sample filtering
 
-## Probe filtering 
+## Probe filtering
 
-## Methylation summary measures 
+## Methylation summary measures
 
 We created several methylation summary measures. Global methylation was calculated for each sample as the mean methylation value of each sample across the cleaned probe set. Methylation clocks were calculated for each sample according to the methods of --INSERT HERE--. To create polymethylation scores, 6,000 (CHECK) CpG sites with regression coefficients reported in @Joubert:2016ue were multiplied by methylation beta values from FFCW and summed. We calculated polymethylation scores using regression coefficients from 4 different regressions reported in @Joubert:2016ue (LIST) and 3 different methods of transforming the methylation beta values (no transformation, mean center, and z-score standardization).
 
-## Statistical analysis 
+## Statistical analysis
