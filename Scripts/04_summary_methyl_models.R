@@ -30,7 +30,7 @@ datadir="/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/CreatedData"
 outputdir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Output"
 #read data 
 load(paste0(datadir, '/completeCasemethyl.Rdata'))
-modeldata=completecase%>%droplevels()
+modeldata=completecase%>%droplevels()%>%copy_labels(completecase)
 
 #set as factors 
 modeldata$PostnatalMaternalSmokingAny<-factor(modeldata$PostnatalMaternalSmokingAny, 
@@ -40,14 +40,18 @@ modeldata$SmkAtVisitPastmonth<-factor(modeldata$SmkAtVisitPastmonth,
                                       levels=c("No smoking", 
                                                "Less than pack a day", 
                                                "Pack or more a day", "Missing"))
-modeldata$slide<-factor(modeldata$slide)
+#modeldata$slide<-factor(modeldata$slide)
 modeldata$Sample_Plate<-factor(modeldata$Sample_Plate)
 
 #sv data - no variance filter, whole subset
-load(paste0(datadir, '/svNone.Rds'))
+sv.vNone=readRDS(paste0(datadir, '/svNone.Rds'))
 is_sv=function(x) str_replace_all(x, " ", "")
 sv.vNone=sv.vNone%>%rename_with(is_sv, contains('sv'))
-modeldata=left_join(modeldata, sv.vNone)
+modeldata=left_join(modeldata, sv.vNone)%>%copy_labels(modeldata)
+set_label(modeldata$Sample_Plate)='Batch'
+set_label(modeldata$PostnatalMaternalSmokingAny)='Any postnatal maternal smoking (Age 1 & 5)'
+set_label(modeldata$SmkAtVisitPastmonth)='Primary care giver smoke past month dose'
+save(modeldata, file=file.path(datadir, file='completeCaseSVA.Rdata'))
 
 #################################Set variables for modeling
 #outcomes & outcome_labels
@@ -183,8 +187,15 @@ longitudinal_local_models=my_clean_argnames(longitudinal_local_models, local_pre
 modeldata=modeldata%>%mutate(smkPreg_binaryN=case_when(smkPreg_binary=='Yes'~1, smkPreg_binary=='No'~0))
 
 #global predictors, cross sectional
-roc_predictors=gsub('~smkPreg_binary', '', paste0(base_model_vars, global_pcs))
-args=list('childteen'=age_vector, 'methylation'=c('', y_vector, 'cg05549655'), 'covariates'=roc_predictors)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))
+roc_predictors=c('', gsub('~smkPreg_binary', '', paste0(base_model_vars, global_pcs)))
+args=list('childteen'=age_vector, 'methylation'=c('', y_vector, 'cg05549655'), 'covariates'=roc_predictors)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))%>%
+  filter(predictors!='')
+
+
+methyl_names=data.frame(name_methyl=c('No methylation', 'Global methylation', 'Pediatric clock', 
+                   'Any smoking (newborn)', 'Sustained smoking w/ cell type correction (newborn)', 
+                   'Sustain smoking (older children)', 'AHRR: ch05575921', "CYP1A1: cg05549655" ), 
+           methylation=c('', y_vector, 'cg05549655'))
 
 global_roc=modeldata%>%
   group_by(childteen)%>%nest()%>%left_join(args)%>%
@@ -192,11 +203,15 @@ global_roc=modeldata%>%
          tidied=map(model, tidy, conf.int=T), 
          augmented=map(model, augment, type.predict = "response"), 
          roc=map(augmented, ~roc(.x$smkPreg_binaryN, .x$.fitted)), 
-         test=map(roc, ~data.frame('sens'=.x$sensitivities, spec=.x$specificities)))
+         test=map(roc, ~data.frame('sens'=.x$sensitivities, spec=.x$specificities)))%>%
+  left_join(methyl_names)%>%
+  mutate(modeltype=case_when(covariates==''~name_methyl, 
+                             covariates!=''~paste0('Base model+', name_methyl)))%>%
+  mutate(auc=map_dbl(roc, ~as.numeric(gsub('Area under the curve', '', .x$auc))))
 
 #local predictors, crosssectional 
-roc_predictors=gsub('~smkPreg_binary', '', paste0(base_model_vars, local_pcs))
-args=list('childteen'=age_vector, 'methylation'=c('', y_vector), 'covariates'=roc_predictors)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))
+roc_predictors=c('', gsub('~smkPreg_binary', '', paste0(base_model_vars, local_pcs)))
+args=list('childteen'=age_vector, 'methylation'=c('', y_vector), 'covariates'=roc_predictors)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))%>%filter(predictors!='')
 
 
 local_roc=modeldata%>%group_by(childteen, ancestry)%>%nest()%>%left_join(args)%>%
@@ -204,7 +219,13 @@ local_roc=modeldata%>%group_by(childteen, ancestry)%>%nest()%>%left_join(args)%>
          tidied=map(model, tidy, conf.int=T), 
          augmented=map(model, augment, type.predict = "response"), 
          roc=map(augmented, ~roc(.x$smkPreg_binaryN, .x$.fitted)), 
-         test=map(roc, ~data.frame('sens'=.x$sensitivities, spec=.x$specificities)))
+         test=map(roc, ~data.frame('sens'=.x$sensitivities, spec=.x$specificities)))%>%
+  left_join(methyl_names)%>%
+  mutate(modeltype=case_when(covariates==''~name_methyl, 
+                             covariates!=''~paste0('Base model+', name_methyl)))%>%
+  mutate(auc=map_dbl(roc, ~as.numeric(gsub('Area under the curve', '', .x$auc))))
+  
+
 
 #global predictors, longitudinal 
 modeldata_wide = modeldata%>%
@@ -225,6 +246,6 @@ long_global_roc=args %>%
          roc=map(augmented, ~roc(.x$smkPreg_binaryN, .x$.fitted)), 
          test=map(roc, ~data.frame('sens'=.x$sensitivities, spec=.x$specificities)))
 
-save(file=paste0(data.dir, 'methylation_summarymodels.Rdata'))
+save(list=c('long_global_roc', 'local_roc', 'global_roc', 'longitudinal_local_models', 'longitudinal_global_models', 'local_models', 'global_models'), file=paste0(datadir, '/methylation_summarymodels.Rdata'))
 
 

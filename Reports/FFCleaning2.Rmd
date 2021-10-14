@@ -422,7 +422,7 @@ polyscores_wide<-lapply(seq_along(polyscores), function(i) polyscores[[i]] %>% s
 
 ### Surrogate variables 
 
-```{r sva}
+```{r sva, eval=F}
 
 var.filter=5000
 #make a matrix of model data 
@@ -967,7 +967,7 @@ Ancestry specific models - by ancestry groups; replace ancestry control with con
 Longitduinal models - no additional filtering needed
 
 
-```{r, saveData}
+```{r saveData, eval=F}
 save(child_base, file=paste0(datadir, 'CreatedData/', 'ChildBaseModelData.Rdata'))
 save(teen_base, file=paste0(datadir, 'CreatedData/', 'ChildBaseModelData.Rdata'))
 save(basemodeldata, file=paste0(datadir, 'CreatedData/', 'BaseModelData.Rdata'))

@@ -1,0 +1,21 @@
+#!/bin/bash
+# The interpreter used to execute the script
+
+#“#SBATCH” directives that convey submission options:
+
+#SBATCH --job-name=ewas
+#SBATCH --mail-type=BEGIN,END
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=180g
+#SBATCH --time=50:00:00
+#SBATCH --account=bakulski1
+#SBATCH --partition=standard
+#SBATCH --output=/nfs/turbo/bakulski1/People/blostein/FF_methylation/Code/UsefulCode/%x-%j.log
+
+
+#module load R
+
+module load R/4.1.0
+
+R CMD BATCH --no-restore --no-save --quiet /nfs/turbo/bakulski1/People/blostein/FF_methylation/Code/Scripts/05_ewas.R ewas.out
