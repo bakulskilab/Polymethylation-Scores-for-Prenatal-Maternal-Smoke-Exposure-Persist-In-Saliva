@@ -1,26 +1,46 @@
 ---
-output: html_document
-bibliography: "../Methylation_SmokingBib.bib"  
+output:
+  word_document: default
+  html_document: default
+bibliography: Methylation_SmokingBib.bib
 ---
 
-# Methods
+## Methods
 
-## Cohort
+### Cohort
 
-The Fragile Families and Child Wellbeing Study (FFCW) is a nationally-representative cohort of nearly 5,000 children born in 20 U.S. cities between 1998 and 2000 [@Reichman:2001wv]. FFCW sampled births using a three-stage stratified random sample design, described in detail elsewhere [@Reichman:2001wv]. FFCW excluded the following births from the study: those with parents who planned to place the child for adoption, those where the father was deceased, those who did not speak English or Spanish well enough to be interviewed, those where the mothers or babies were too ill to complete the interview and those where the baby died before the interview could take place. At some of the hospitals, parents who were under 18 were not eligible to be interviewed due to hospital prohibition. Children were followed from birth until age fifteen. At the time of birth, medical record information was extracted from the hospital at which the mother gave birth. Interviews were conducted with the mother at birth in person and with father in person or over the telephone if he was not present. Interviews were also conducted with the mother and father when the child was one, three, five, and nine via telephone. Additionally, at ages three, five and nine, a separate primary caregiver survey was administered to the individual with whom the child was living either over the telephone or in the home. The child was interviewed at age nine in the home and at age fifteen by telephone or in the home. At ages nine and fifteen a saliva sample was taken from the child for DNA and DNA methylation measurements [@Reichman:2001wv].
+The Fragile Families and Child Wellbeing Study (FFCW) is a birth cohort of nearly 5,000 children born in 20 U.S. cities between 1998 and 2000 [@Reichman:2001wv]. FFCW sampled births using a three-stage stratified random sample design, described in detail elsewhere, which oversampled unmarried mothers by a ratio of 3:1 [@Reichman:2001wv]. FFCW excluded the following births from the study: those with parents who planned to place the child for adoption, those where the father was deceased, those who did not speak English or Spanish well enough to be interviewed, those where the mothers or babies were too ill to complete the interview and those where the baby died before the interview could take place. Children were followed longitudinally with assessments at ages 1, 3, 5, 9 and 15; additional follow up is ongoing. Assessments include medical record extraction, biosample collection, in-home assessments, and surveys of the mother, father, primary caregiver, teacher and child. At ages nine and fifteen a saliva sample was taken from the child for DNA and DNA methylation measurements [@Reichman:2001wv].
 
-## Prenatal maternal smoking measurement
+### Covariates and exposure measurement
 
-## Covariates
+Demographic and prenatal maternal substance use variables were derived from maternal self-report questionnaire data at baseline (child's birth). Demographic variables included maternal income to poverty ratio and child sex. Prenatal maternal alcohol and other drug use were dichotomized to any vs no prenatal maternal alcohol and drug use respectively. Prenatal maternal smoking was ascertained from the categorical interview question
 
-## DNA methylation measurement
+> "During your pregnancy, how many cigarettes did you smoke? Did you smoke...:
+>
+> 2 or more packs a day
+>
+> 1 or more but less than 2 packs per day
+>
+> 	Less than 1 pack a day
+>
+> 	None
 
-## Sample filtering
+Because few participants reported smoking a pack or more a day, this question was also dichotomized to any vs no prenatal maternal smoking.
 
-## Probe filtering
+Postnatal second-hand smoke exposure was encoded in two variables. To encapsulate general early childhood smoke exposure, we used a binary any postnatal exposure to maternal or primary caregiver smoking at ages 1 or 5 , constructed from questions about maternal or primary caregiver smoking in the age 1 and 5 interviews. To encapsulate recent postnatal smoke exposure, we used a categorical packs per day maternal or primary care giver smoking in the month prior to age 9 and 15 maternal interview.
 
-## Methylation summary measures
+Principal components of child genetic ancestry were calculated from genetic data (CHIP?) from child saliva samples. In non-stratified models, the first two components of genetic ancestry from principal component analysis run in the entire analytic subset were used, in ancestry-stratified models the first two principal components from principal component analysis run within each strata were used.
 
-We created several methylation summary measures. Global methylation was calculated for each sample as the mean methylation value of each sample across the cleaned probe set. Methylation clocks were calculated for each sample according to the methods of --INSERT HERE--. To create polymethylation scores, 6,000 (CHECK) CpG sites with regression coefficients reported in @Joubert:2016ue were multiplied by methylation beta values from FFCW and summed. We calculated polymethylation scores using regression coefficients from 4 different regressions reported in @Joubert:2016ue (LIST) and 3 different methods of transforming the methylation beta values (no transformation, mean center, and z-score standardization).
+Confounder variables included principal components of child genetic ancestry, prenatal maternal alcohol and other drug use.
 
-## Statistical analysis
+Precision variables (variables strongly associated with DNA methylation controlled for to decrease standard errors of coefficient of interest) included child sex, cell proportions estimated from DNA methylation data
+
+### DNA methylation measurement
+
+Salivary samples from the children in FFCW were taken at ages nine and fifteen using the Oragene•DNA sample collection kit (DNA Genotek Inc., Ontario). Saliva DNA was extracted manually using DNA Genotek's purification protocol using prepIT L2P. DNA was bisulfite treated and cleaned using the Zymo Research EZ DNA Methylation kit. Samples were randomized and plated across slides by demographic characteristics. Saliva DNA methylation was measured using the Illumina HumanMethylation 450k BeadArray [@Sandoval2011] and imaged using the Illumina iScan system. All samples were run in a single batch to minimize technical variability.
+
+DNA methylation image data (IDAT) were processed in R statistical software (3.5) using the minfi package [@Aryee2014]. The IDAT pairs (n=1811 ????) were read into R and the minfi *preprocessNoob* function was used to normalize dye bias and apply background correction. Further quality control was applied using the ewastools packages [@Heiss2018]. We dropped samples with \>10% of sites have detection p-value \>0.01 (n=43), sex discordance between DNA methylation predicted sex and recorded sex (n=20), and abnormal sex chromosome intensity (n=3). CpG sites were removed if they had detection p-value \>0.01 in 5% of samples (n=26,830) or were identified as cross-reactive (n=27,782) [@Chen2013]. Relative proportions of immune and epithelial cell types were estimated from DNA methylation measures using a childhood saliva reference panel [@Middleton2021].
+
+Global methylation was calculated for each sample as the mean methylation value of each sample across the cleaned probe set. Pediatric epigenetic age was calculated for each sample. To create polymethylation scores for prenatal maternal smoke exposure, 6,074 CpG sites with regression coefficients reported in Joubert et al. 2016 [@Joubert:2016ue] were multiplied by mean-centered methylation beta values from FFCW and summed. We calculated polymethylation scores using regression coefficients from 4 different regressions reported in Joubert et al. 2016 [@Joubert:2016ue] (sustained smoking exposure and DNA methylation in newborn cordblood with cell-type control, sustained smoking exposure and DNA methylation in newborn cordblood without cell-type control, sustained smoking exposure and DNA methylation in older children peripheral blood, any smoking exposure and DNA methylation in newborn cordblood ).
+
+Epigenome-wide association analyses were run separately at age 9 and age 15 using the linear models and the R package limma [@Ritchie2015]. We also ran epigenome wide association analyses using DNA methylation measures from both time points using linear mixed effect models with a random intercept for child ID. Gap probes were identified using the function *gaphunter* from the R package minfi [@Aryee2014].
