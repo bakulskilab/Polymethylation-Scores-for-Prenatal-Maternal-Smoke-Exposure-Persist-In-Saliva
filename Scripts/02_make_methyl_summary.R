@@ -77,7 +77,10 @@ polyscores_wide<-lapply(seq_along(polyscores), function(i) polyscores[[i]] %>% s
 if(nrow(betaqc)==423668){
   clocks<-read.csv(file=paste0(datadir, "OGData/ffcw_n1776_8clocks.csv"), header = T)
   colnames(clocks)[1]<-"MethID"
-}
+  grim_pk=read.csv(file=file.path(datadir, 'OGData', 'dnampackyrs_fromgrimoutput.csv'), header=T)
+  colnames(grim_pk)[1]<-'MethID'
+  clocks<-left_join(clocks, grim_pk)
+  }
 #the below code will run if the # CpGs in your chosen CpG matrix isn't 423668 (see note at top re: Jonah email) as the clocks
 #from ffcw_n1776_8clocks.csv were run using the 423668 matrix. if you switch to some other beta matrix, this code will recreate 
 # the clocks for you, except levine and GRIM clock which requires different code. 
@@ -126,7 +129,7 @@ methyl_labels_jonahclocks=c('Methylation data ID', 'Epithelial cell proportion',
                             'Global methylation', 'AHHR: cg05575921', 'MYO1G: cg04180046', 'CYP1A1: cg05549655', 'GFI1: cg14179389', "MYO1G: cg22132788", 
                             pms_labels, gsub('no transform', 'z-score standardized', pms_labels), gsub('no transform', 'mean-centered', pms_labels), 
                             'ID', 'Visit',
-                            'Horvath clock', 'SkinBlood clock', 'Hannum clock', 'Pediatric clock', 'Levine clock', 'PoAm clock 38', 'PoAm clock 45', 'GRIM clock')
+                            'Horvath clock', 'SkinBlood clock', 'Hannum clock', 'Pediatric clock', 'Levine clock', 'PoAm clock 38', 'PoAm clock 45', 'GRIM clock', 'GRIM pack/yrs component')
 
 if(nrow(betaqc)==423668){
   set_label(methyldata)=methyl_labels_jonahclocks

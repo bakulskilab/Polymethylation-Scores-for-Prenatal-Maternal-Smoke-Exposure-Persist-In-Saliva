@@ -119,6 +119,10 @@ FF_labeled=FF_labeled %>%
 
 #ancestry
 #read in local and global pc data
+id_list=list.files(path=paste0(datadir, "OGData/pcs"), pattern='*idnums*', full.names=TRUE)
+id_list%>%map_dfr(read.table, .id='ancestry')
+
+
 pc_files=list.files(path=paste0(datadir, "OGData/pcs"), pattern='*.csv', full.names=TRUE)
 names(pc_files)=gsub('.csv', '', list.files(path=paste0(datadir, "OGData/pcs"), pattern='*.csv'))
 names(pc_files)=paste0(str_to_title(names(pc_files)), ' ancestry')

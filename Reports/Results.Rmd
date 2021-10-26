@@ -71,8 +71,11 @@ theme_set(theme_bw())
 
 ```{r}
 modeldata=modeldata %>% mutate(childteen=factor(childteen, levels=c('Age 9', 'Age 15')))
+set_label(modeldata$childteen)='Visit'
+
 n_total=modeldata %>% dplyr::select(id)%>%unique()%>%nrow()
-n_obs=modeldata%>%nrow()
+m_obs=modeldata%>%nrow()
+n_twovisit=modeldata %>% group_by(id)%>%summarise(n=n())%>%filter(n==2)%>%nrow()
 
 all_methyl=c("globalmethylation", "pediatric", "grim", "Epithelial.cells_saliva", "Leukocytes_saliva", "SSnewborn_center", "SSnewbornCT_center", "SSolder_center", "cg05575921")
 main_methyl=c("globalmethylation", "pediatric", "SSnewbornCT_center", "cg05575921")
@@ -105,46 +108,12 @@ my_round=function(x, d){
 ```{r figure counter}
 main_fig=1
 sup_fig=1
+main_tab=1
+sup_tab=1
 ```
 
-    
-# Target journal and deadline 
 
-[Clinical epigenetics](https://www.biomedcentral.com/collections/epibio): Special issue on biomarkers; due date December 1st
-
-
- "Epigenetic biomarkers have significantly contributed to improved understanding of the origins and progression of disease.  Moreover, increasing evidence shows that epigenetic biomarkers have potential for personalized medicine. However, routine use of epigenetic biomarkers in in-vitro diagnostics (IVD) is lagging behind the discoveries of new biomarkers. In this thematic series of Clinical Epigenetics, we discuss current progress in development of epigenetic biomarkers for clinical use in common complex diseases of ageing and welcome both original research and reviews.
-The sections of the collection include:
-
-  - Types of epigenetic biomarkers and readiness for IVD use
-  
-    - DNA methylation as biomarker
-    
-    - Histone modification as biomarker
-    
-    - Upcoming field of circulating free nucleosomes as biomarker
-    
-    - Progress towards clinical use of biomarker
-    
-  - *Biomarkers of environmental exposures and causality of the biomarker*
-  
-  - Disease predisposition biomarkers
-  
-  - Biomarkers used for disease detection
-  
-  - Clinical disease prevention and management: predictive and prognostic
-  
-  - Monitoring of chronic disease
-  
-  - *Single versus multiple biomarkers and risk scores*
-  
-  - Major stages of clinical validation of the biomarker
-  
-  - Biomarker detection technologies suitable for IVD use and significance of bioinformatics
-  
-  - Ethics and regulatory aspects of IVD epigenetic biomarkers
-
-# Figure 1 - Selection of samples from the Fragile Families and Child Wellbeing (FFCW) study into this analysis. N represents the number of individuals at each step in the selection procedure, M represents the number of samples, as individuals with repeated measures can have more than one sample. 
+# Figure `r main_fig` - Selection of samples from the Fragile Families and Child Wellbeing (FFCW) study into this analysis. N represents the number of individuals at each step in the selection procedure, M represents the number of samples, as individuals with repeated measures can have more than one sample. 
 
 ```{r, eval=T}
 #function
@@ -301,13 +270,8 @@ graph1 %>%
 
 main_fig=main_fig+1            
 ```
-# Internal table - prenatal maternal smoke exposure dose vs binary
 
-```{r}
-modeldata %>%dplyr::select(m1g4, smkPreg_binary)%>%tbl_summary(.,by=smkPreg_binary)
-```
-
-# Supplemental Table 1 - Descriptive statistics of excluded vs included samples with methylation data available from the Fragile and Families and Child Wellbeing study
+# Supplemental Table `r sup_tab` - Descriptive statistics of excluded vs included samples with methylation data available from the Fragile and Families and Child Wellbeing study
 
 ```{r}
 myFF$MethylData2<-ifelse(myFF$MethID %in% modeldata$MethID, 'Final analysis group', 'Not in final analysis group')
@@ -323,14 +287,18 @@ exclusion_tbl=myFF %>% mutate(childteen=case_when(childteen=='C'~'Age 9', childt
          Epithelial.cells_saliva, Leukocytes_saliva, SSnewbornCT_center, SSolder_center,
          cg05575921, MethylData2)%>%
   tbl_summary(., by=MethylData2, statistic=list(all_continuous()~"{mean} ({sd})"))%>%
-  add_n()%>%add_p(test=list(all_continuous()~"t.test"))
+  modify_header(stat_by = "**{level}**, M samples = {n}")%>%
+  add_n(col_label='M samples')#%>%
+  #add_p(test=list(all_continuous()~"t.test"))
 
 exclusion_tbl
+
+sup_tab=sup_tab+1
 ```
 
 
 
-# Supplemental Figure 2 - Correlation of methylation summary measures
+# Supplemental Figure `r sup_fig` - Pearson correlation of methylation summary measures from an anlysis of M=`r m_obs` samples and N=`r n_total`children in the Fragile Families and Child Wellbeing cohort
 
 ```{r, fig.width=12, fig.height=12}
 library(Hmisc)
@@ -344,12 +312,12 @@ corrplot.mixed(res2, upper="ellipse", lower='number', order='hclust', tl.pos ="l
 pdf(file.path(outdir, paste0('SupplementalFigure', sup_fig, '.pdf')))
 corrplot.mixed(res2, upper="ellipse", lower='number', order='hclust', tl.pos ="lt", tl.cex=0.8)
 dev.off()
+
 sup_fig=sup_fig+1
-    
 ```
 
 
-# Supplemental Figure 3 - Correlation between visits among DNA methylation summary measures 
+# Supplemental Figure `r sup_fig` - Correlation between age 9 and age 15 visits for selected DNA methylation summary measures among `r n_twovisit` children with age 9 and age 15 visit data in the Fragile Families and Child Wellbeing study
 
 ```{r}
 age_long_methyl=modeldata%>%
@@ -364,6 +332,10 @@ age_wide_methyl=age_long_methyl%>%
   pivot_wider(names_from=childteen, 
               values_from=`Methylation summary measure`)
 
+#checks
+if(age_wide_methyl%>%filter(Methyl_factor=='globalmethylation')%>%filter(!is.na(`Age 9`) & !is.na(`Age 15`))%>%nrow()!=n_twovisit){stop('check sample size two visit vs age_wide methyl')}
+
+
 visit_cor=age_wide_methyl%>%
   ggplot(aes(x=`Age 9`, y=`Age 15`))+geom_point()+stat_cor()+geom_smooth(method=lm)+theme_classic()+
   scale_x_continuous('Age 9 score')+scale_y_continuous('Age 15 score')+
@@ -375,7 +347,7 @@ ggexport(visit_cor, filename=file.path(outdir, paste0('SupplementalFigure', sup_
 sup_fig=sup_fig+1
 ```
 
-# Supplemental Figure XX: Distributions of methylation summary measures at age 9 and age 15
+# Supplemental Figure `r sup_fig`: Distributions of selected methylation summary measures at age 9 and age 15 among `r n_total` children in the Fragile Families and Child Wellbeing study
 
 ```{r, fig.height=11}
 dist_methyl=age_long_methyl%>%
@@ -395,12 +367,12 @@ sup_fig=sup_fig+1
 ```
 
 
-# Figure 2: Polymethylation scores are correlated and stable between age 9 and age 15 in a diverse sample of `r n_total` US children 
+# Figure `r main_fig`: Differences in selected DNA methylation summary measures by prenatal maternal smoke exposure among `r n_total` US children in the Fragile Families and Child Wellbeing study
 
 ```{r change in scores time, fig.width=12}
 
 #add line for mean ? 
-outcome_labels=c('Global methylation', 'Pediatric clock', 'AHHR: cg05575921', 'Polymethylation score \n (newborn, mean centered)', 'Polymethylation score  \n (older children, mean centered')
+outcome_labels=c('Global methylation', 'Pediatric clock', 'AHRR: cg05575921', 'Polymethylation score \n (newborn, mean centered)', 'Polymethylation score  \n (older children, mean centered')
 names(outcome_labels)=c('globalmethylation', 'pediatric', 'cg05575921', 'SSnewbornCT_center','SSolder_center')
 
 fig2=age_long_methyl%>%
@@ -422,7 +394,7 @@ main_fig=main_fig+1
 ```
 
 
-# Table 1: Bivariate associations between prenatal maternal smoking, DNA methylation summary measures and important covariates among a diverse sample of 
+# Table `r main_tab`: Bivariate associations between prenatal maternal smoking, selected DNA methylation summary measures and important covariates among a diverse sample of `r n_total` children in the Fragile Families and Child Wellbeing study
 
 ```{r bivariate table}
 smoking_tbl=modeldata %>% 
@@ -439,15 +411,17 @@ smoking_tbl=smoking_tbl%>%as_gt()%>%
   tab_row_group(label='Child', rows=12:25)
 
 smoking_tbl
+
+main_tab=main_tab+1
 ```
 
 
-# Figure 3 - Polymethylation scores are associated with prenatal maternal smoke exposure consistently across age and ancestry group in a sample of `r n_total` US children
+# Figure `r main_fig` - Polymethylation scores are associated with prenatal maternal smoke exposure consistently across age and ancestry group in a sample of `r n_total` US children
 
 ```{r, fig.width=12}
-my_outcomes=c('Global methylation', 'Pediatric clock', 'AHHR: cg05575921', 'Sustained smoking polymethylation score (newborns, cell-type controlled)')
+my_outcomes=c('Global methylation', 'Pediatric clock', 'AHRR: cg05575921', 'Sustained smoking polymethylation score (newborns, cell-type controlled)')
 
-outcome_labels=c('Global methylation', 'Pediatric clock', 'AHHR: cg05575921',  'Polymethylation score \n (newborn, mean centered)')
+outcome_labels=c('Global methylation', 'Pediatric clock', 'AHRR: cg05575921',  'Polymethylation score \n (newborn, mean centered)')
 
 all_models=rbind(local_models, global_models%>%mutate(ancestry='Unstratified'))
 
@@ -481,9 +455,7 @@ ggexport(forest_plot, filename=file.path(outdir, paste0('Figure', main_fig, '.pd
 main_fig=main_fig+1
 ```
 
-# Internal Table and Figure: Question: Remove postnatal maternal smoking variable from models and/or use base model or prenatal exposures as main paper figures? 
-
-Somewhat concerned about extrapolated inference: very few exposed children (post-ancestry stratification) who were not also exposed to postnatal smoking. 
+# Supplemental Figure `r sup_fig`: Sensitivity analyses for controlling for different variable sets in multivariable analyses of prenatal maternal smoking and DNA methylation summary measures  
 
 ```{r, fig.width=14}
 with(modeldata, table(ancestry, PostnatalMaternalSmokingAny, smkPreg_binary))%>%kbl()
@@ -506,10 +478,11 @@ forest_plot_compareModels=all_models%>%
 
 forest_plot_compareModels
 
-ggexport(forest_plot_compareModels, filename=file.path(outdir, paste0('InternalFigure', '1', '.pdf')), width=15, height=15)
+ggexport(forest_plot_compareModels, filename=file.path(outdir, paste0('SupplementalFigure', sup_fig, '.pdf')), width=15, height=15)
+sup_fig=sup_fig+1
 ```
 
-# Supplemental Figure DNA methylation summary measures across prenatal and postnatal exposures
+# Supplemental Figure `r sup_fig` DNA methylation summary measures across prenatal and postnatal exposures
 
 ```{r, fig.width=14, fig.height=10}
 
@@ -546,13 +519,14 @@ modeldata%>%
     scale_x_discrete(labels=function(x) str_wrap(x, width = 10))+
     theme(legend.position = 'right')+
   guides(color=guide_legend(nrow=4,byrow=TRUE))
+sup_fig=sup_fig+1
 ```
 
 
-# Supplemental Table XX: Associations between prenatal maternal smoking and DNA methylation summary measures in multivariable models among `r n_total` US children by age 
+# Supplemental Table `r sup_tab`: Associations between prenatal maternal smoking and DNA methylation summary measures in multivariable models among `r n_total` US children by age 
 
 ```{r}
-#my_main_outcomes=c('AHHR: cg05575921', 'Sustained smoking polymethylation score (newborns, cell-type controlled)', 'Sustained smoking polymethylation score (older children)', 'Pediatric clock', 'Global methylation')
+#my_main_outcomes=c('AHRR: cg05575921', 'Sustained smoking polymethylation score (newborns, cell-type controlled)', 'Sustained smoking polymethylation score (older children)', 'Pediatric clock', 'Global methylation')
 
 test=rbind(global_models, longitudinal_global_models %>% mutate(childteen='Longitudinal'))%>%
   filter(predictors=='secondhand smoke exposure model')%>%
@@ -572,9 +546,10 @@ regression_table_age=tbl_stack(table_list, group_header=names(table_list))
 
 regression_table_age
 
+sup_tab=sup_tab+1
 ```
 
-# Supplemental Table XX: Associations between prenatal maternal smoking and DNA methylation summary measures in multivariable models among `r n_total` US children by ancestry 
+# Supplemental Table `r sup_tab`: Associations between prenatal maternal smoking and DNA methylation summary measures in multivariable models among `r n_total` US children by ancestry 
 
 
 ```{r}
@@ -595,13 +570,15 @@ regression_table_ancestry=tbl_stack(table_list, group_header=names(table_list))
 
 regression_table_ancestry
 
+sup_tab=sup_tab+1
+
 ```
 
 
 
 
 
-# Supplemental Figure XX: Surrogate variable associations with known covariates
+# Supplemental Figure `r sup_fig`: Surrogate variable associations with known covariates
 
 ```{r, fig.width=12, fig.height=8}
 #bring the heatmap function
@@ -658,7 +635,7 @@ sup_fig=sup_fig+1
 ```
 
 
-# Supplemental Table XX: Surrogate variable models 
+# Supplemental Table `r sup_tab`: Coefficients for multivariable models of prenatal maternal smoke exposure regressed on selected DNA methylation summary variables (outcomes) among children in the Fragile Families and Child Wellbeing study 
 
 ```{r}
 test=rbind(global_models, longitudinal_global_models %>% mutate(childteen='Longitudinal'))%>%
@@ -693,11 +670,13 @@ table_list=test %>%split(f=.$ancestry)%>%map(~tbl_merge(.x$tbl,
 regression_table_ancestry_svs=tbl_stack(table_list, group_header=names(table_list))
 
 regression_table_ancestry_svs
+
+sup_tab=sup_tab+1
 ```
 
 
 
-# Figure 4 - Polymethylation scores more accurately delineate prenatal smoke exposure status than non-targeted DNA methylation summary measures and *a priori* CpGs 
+# Figure `r main_fig` - Polymethylation scores more accurately delineate prenatal smoke exposure status than non-targeted DNA methylation summary measures and *a priori* CpGs 
 
 ```{r, fig.width=10}
 
@@ -979,7 +958,7 @@ top_cpgs = map(base_models, ~.x %>%filter(adj.P.Val<0.05)%>%dplyr::select(CPG, M
 top_cpg_gaps=top_cpgs[top_cpgs$CPG %in% rownames(all_gaps$proberesults),]
 top_cpgs=top_cpgs[!(top_cpgs$CPG %in% rownames(all_gaps$proberesults)),]
 top_cpg_groups=top_cpgs %>%group_by(CPG)%>%dplyr::summarise(models=list(ModelType))
-top_cpg_names=c(top_cpgs%>%pull(label)%>%unique(), 'AHHR: cg05575921', 'MYO1G: cg22132788')
+top_cpg_names=c(top_cpgs%>%pull(label)%>%unique(), 'AHRR: cg05575921', 'MYO1G: cg22132788')
 top_cpgs=c(top_cpgs %>% pull(CPG)%>%unique(), 'cg05575921', 'cg22132788')
 
 betaqc<-readRDS(file=file.path(datadir, 'OGData', "betaqc.rds"))

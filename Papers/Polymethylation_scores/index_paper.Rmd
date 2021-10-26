@@ -10,6 +10,11 @@ bibliography: Methylation_SmokingBib.bib
 csl: springer-vancouver.csl
 ---
 
+```{r, echo=F, include=F, warning=F, message=F}
+library(stringr)
+results_run=str_detect(here::here(), 'nfs/turbo/bakulski1')
+```
+
 ```{r child = here::here("Papers", "Polymethylation_scores", "01_titlepage.Rmd")}
 ```
 
@@ -22,7 +27,7 @@ csl: springer-vancouver.csl
 ```{r child = here::here("Papers", "Polymethylation_scores", "04_background.Rmd")}
 ```
 
-```{r child = here::here("Papers", "Polymethylation_scores", "05_results.Rmd")}
+```{r child = here::here("Papers", "Polymethylation_scores", "05_results.Rmd"), eval=results_run}
 ```
 
 ```{r child = here::here("Papers", "Polymethylation_scores", "06_discussion.Rmd")}
