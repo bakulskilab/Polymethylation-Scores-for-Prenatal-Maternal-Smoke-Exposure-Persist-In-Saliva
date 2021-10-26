@@ -6,7 +6,8 @@ output:
   word_document: default
   html_document:
     df_print: paged
-bib: ../Methylation_SmokingBib.bib
+bibliography: Methylation_SmokingBib.bib
+csl: springer-vancouver.csl
 ---
 
 ```{r child = here::here("Papers", "Polymethylation_scores", "01_titlepage.Rmd")}
@@ -28,6 +29,9 @@ bib: ../Methylation_SmokingBib.bib
 ```
 
 ```{r child = here::here("Papers", "Polymethylation_scores", "07_conclusions.Rmd")}
+```
+
+```{r child = here::here("Papers", "Polymethylation_scores", "08_methods.Rmd")}
 ```
 
 ```{r child = here::here("Papers", "Polymethylation_scores", "98_declarations.Rmd")}
