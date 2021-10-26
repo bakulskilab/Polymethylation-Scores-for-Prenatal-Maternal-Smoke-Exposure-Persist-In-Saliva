@@ -33,6 +33,7 @@ load(paste0(datadir, '/completeCasemethyl.Rdata'))
 modeldata=completecase%>%droplevels()%>%copy_labels(completecase)
 
 #set as factors 
+modeldata=modeldata %>% mutate(childteen=factor(childteen, levels=c('Age 9', 'Age 15')))
 modeldata$PostnatalMaternalSmokingAny<-factor(modeldata$PostnatalMaternalSmokingAny, 
                                               levels=c("No maternal smoking at age 1 and 5", 
                                                        "Maternal smoking at age 1 or age 5"))
@@ -55,6 +56,7 @@ save(modeldata, file=file.path(datadir, file='completeCaseSVA.Rdata'))
 
 #################################Set variables for modeling
 #outcomes & outcome_labels
+
 y_vector<-c("globalmethylation", "pediatric", "anynewborn_center", "SSnewbornCT_center", "SSolder_center", "cg05575921")
 outcome_labels=c('Global methylation', 'Pediatric clock',  
                  'Any smoking polymethylation score (newborns)', 
@@ -63,8 +65,9 @@ outcome_labels=c('Global methylation', 'Pediatric clock',
                  'AHHR: cg05575921')
 names(outcome_labels)=y_vector
 
+
 #model variables (excepting PCs, add in individually for global & ancestry specific models)
-base_model_vars<-"~smkPreg_binary+cm1bsex+cm1inpov+Leukocytes_saliva+Epithelial.cells_saliva+Sample_Plate"
+base_model_vars<-"~smkPreg_binary+cm1bsex+cm1inpov+Leukocytes_saliva+Sample_Plate+ChildAgeComposite"
 prenatal_model_vars<-paste0(base_model_vars, "+m1g2_YesNoPreg+m1g3_YesNoPreg")
 secondhand_model_vars<-paste0(prenatal_model_vars, '+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth')
 interaction_model_vars<-paste0(secondhand_model_vars, '+ChildAgeComposite:smkPreg_binary')
@@ -140,7 +143,7 @@ global_models=my_clean_argnames(global_models, global_predictors)
 #########################Local
 #arguments
 local_predictors=c(paste0(predictors, local_pcs), surrogate_model_vars)
-args=list('childteen'=c('C', 'T'), 'outcome'=y_vector, 'predictors'=local_predictors, 'ancestry'=ancestry_vector)%>%cross_df()
+args=list('childteen'=c('Age 9', 'Age 15'), 'outcome'=y_vector, 'predictors'=local_predictors, 'ancestry'=ancestry_vector)%>%cross_df()
 
 #run models
 local_models=modeldata%>%group_by(childteen, ancestry)%>%nest()%>%left_join(args)%>%
@@ -156,7 +159,7 @@ local_models=my_clean_argnames(local_models, local_predictors)
 #set predictor variables & arguments
 #include a model with an interaction term b/t age and prenatal smoke exposure
 #to determine if there is a age-slope difference b/t exposed & not exposed
-global_predictors=c(paste0(predictors_interaction, global_pcs, '+ChildAgeComposite'), surrogate_model_vars)
+global_predictors=c(paste0(predictors_interaction, global_pcs), surrogate_model_vars)
 args=list('outcome'=y_vector, 'predictors'=global_predictors)%>%cross_df()
 
 #run models
@@ -169,7 +172,7 @@ longitudinal_global_models=args %>%
 longitudinal_global_models=my_clean_argnames(longitudinal_global_models, global_predictors, childteen = F, model_labs = model_labels_interaction)
 #########################Local
 #set predictor variables and arguments
-local_predictors=c(paste0(predictors_interaction, local_pcs, '+ChildAgeComposite'), surrogate_model_vars)
+local_predictors=c(paste0(predictors_interaction, local_pcs), surrogate_model_vars)
 args=list('outcome'=y_vector, 'predictors'=local_predictors, 'ancestry'=ancestry_vector)%>%cross_df()
 
 #run models
@@ -183,19 +186,22 @@ longitudinal_local_models=my_clean_argnames(longitudinal_local_models, local_pre
 
 
 ################################Reverse models for roc curve########################
- #add a numeric for yes/no smoking for logistic models
+#add a numeric for yes/no smoking for logistic models
 modeldata=modeldata%>%mutate(smkPreg_binaryN=case_when(smkPreg_binary=='Yes'~1, smkPreg_binary=='No'~0))
 
 #global predictors, cross sectional
 roc_predictors=c('', gsub('~smkPreg_binary', '', paste0(base_model_vars, global_pcs)))
-args=list('childteen'=age_vector, 'methylation'=c('', y_vector, 'cg05549655'), 'covariates'=roc_predictors)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))%>%
+roc_outcomes=c('', y_vector, 'cg05549655', 'cg22132788', 'SSnewborn_center')
+args=list('childteen'=age_vector, 'methylation'=roc_outcomes, 'covariates'=roc_predictors)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))%>%
   filter(predictors!='')
 
 
 methyl_names=data.frame(name_methyl=c('No methylation', 'Global methylation', 'Pediatric clock', 
-                   'Any smoking (newborn)', 'Sustained smoking w/ cell type correction (newborn)', 
-                   'Sustain smoking (older children)', 'AHRR: ch05575921', "CYP1A1: cg05549655" ), 
-           methylation=c('', y_vector, 'cg05549655'))
+                                      'Any smoking (newborn)', 'Sustained smoking w/ cell type correction (newborn)', 
+                                      'Sustained smoking (older children)',
+                                      'AHRR: ch05575921', "CYP1A1: cg05549655", "MYO1G: cg22132788", 
+                                      'Sustained smoking (newborn)'), 
+                        methylation=roc_outcomes)
 
 global_roc=modeldata%>%
   group_by(childteen)%>%nest()%>%left_join(args)%>%
@@ -224,11 +230,12 @@ local_roc=modeldata%>%group_by(childteen, ancestry)%>%nest()%>%left_join(args)%>
   mutate(modeltype=case_when(covariates==''~name_methyl, 
                              covariates!=''~paste0('Base model+', name_methyl)))%>%
   mutate(auc=map_dbl(roc, ~as.numeric(gsub('Area under the curve', '', .x$auc))))
-  
+
 
 
 #global predictors, longitudinal 
 modeldata_wide = modeldata%>%
+  mutate(childteen=gsub(' ', '_', childteen))%>%
   dplyr::select(any_of(c('idnum', 'ancestry', 'childteen', 'global_PC1', 
                          'global_PC2', 'local_PC1', 'local_PC2', 
                          'smkPreg_binaryN',  y_vector, 
@@ -236,8 +243,8 @@ modeldata_wide = modeldata%>%
   pivot_wider(names_from = childteen, values_from=any_of(c(y_vector, 'Leukocytes_saliva', 'Epithelial.cells_saliva', 'Sample_Plate', 'SmkAtVisitPastmonth')))
 
 #arguments
-long_predictors=c('', '+cm1bsex+cm1inpov+global_PC1+global_PC2+Leukocytes_saliva_C+Epithelial.cells_saliva_C+Sample_Plate_C+Leukocytes_saliva_T+Epithelial.cells_saliva_T+Sample_Plate_T')
-args=list('methylation'=paste0(y_vector, '_C+', y_vector, '_T') , 'covariates'=long_predictors)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))
+long_predictors=c('', '+cm1bsex+cm1inpov+global_PC1+global_PC2+Leukocytes_saliva_Age_9+Sample_Plate_Age_9+Leukocytes_saliva_Age_15+Sample_Plate_Age_15')
+args=list('methylation'=paste0(y_vector, '_Age_9+', y_vector, '_Age_15') , 'covariates'=long_predictors)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))
 
 long_global_roc=args %>% 
   mutate(model=map(predictors, model_reversed, df=modeldata_wide, y='smkPreg_binaryN~'), 
@@ -247,5 +254,3 @@ long_global_roc=args %>%
          test=map(roc, ~data.frame('sens'=.x$sensitivities, spec=.x$specificities)))
 
 save(list=c('long_global_roc', 'local_roc', 'global_roc', 'longitudinal_local_models', 'longitudinal_global_models', 'local_models', 'global_models'), file=paste0(datadir, '/methylation_summarymodels.Rdata'))
-
-

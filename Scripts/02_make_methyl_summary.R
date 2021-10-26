@@ -18,7 +18,7 @@ library(knitr)
 source(file.path(codedir, 'UsefulCode', 'makePolyEpiScores.R'))
 
 #######################################chose apriori cpgs, if any
-aprioriCG<-c("cg05575921", "cg04180046", "cg05549655", "cg14179389")
+aprioriCG<-c("cg05575921", "cg04180046", "cg05549655", "cg14179389", "cg22132788")
 
 ################################read in methylation data
 #as of october 4 switched to beta file with  423668 probes (see Jonah email search Check in on sex filtration/clocks Fragile Families)
@@ -31,7 +31,7 @@ estF_FF<-as.data.frame(celltypes$estF)%>%
   tibble::rownames_to_column(var='MethID')%>%
   rename_with(~paste0(., '_RPC'), .cols=c('Epi', 'Fib', 'IC'))
 #Middleton method
-estL_FF<-estimateLC(betaqc, 'saliva')%>%
+estL_FF<-estimateLC(betaqc, 'saliva', constrain=TRUE)%>%
   mutate(MethID=colnames(betaqc))%>%
   rename_with(~paste0(., '_saliva'), .cols=c('Leukocytes', 'Epithelial.cells'))
 
@@ -115,15 +115,15 @@ pms_labels=c('Polymethylation score: coefficients for any smoking from newborn c
               'Polymethylation score: coeffcients for sustained smoking from older children peripheral blood meta-analysis (no transform)')
 
 methyl_labels_myclocks=c('Methylation data ID', 'Epithelial cell proportion', 'Fibroblast cel proportion', 'Immune cell proportion',
-                         'Leukocytes proportion (saliva)','Epithelial cell proportion (saliva)', 
-                         'Global methylation', 'AHHR: cg05575921', 'MYO1G: cg04180046', 'CYP1A1: cg05549655', 'GFI1: cg14179389', 
+                         'Immune cell proportion (saliva)','Epithelial cell proportion (saliva)', 
+                         'Global methylation', 'AHHR: cg05575921', 'MYO1G: cg04180046', 'CYP1A1: cg05549655', 'GFI1: cg14179389', "MYO1G: cg22132788", 
                          pms_labels, gsub('no transform', 'z-score standardized', pms_labels), gsub('no transform', 'mean-centered', pms_labels), 
                          'ID', 'Visit',
                          'Horvath clock', 'SkinBlood clock', 'Pediatric clock', 'PoAm clock 38', 'PoAm clock 45')
 
 methyl_labels_jonahclocks=c('Methylation data ID', 'Epithelial cell proportion', 'Fibroblast cel proportion', 'Immune cell proportion',
-                            'Leukocytes proportion (saliva)','Epithelial cell proportion (saliva)', 
-                            'Global methylation', 'AHHR: cg05575921', 'MYO1G: cg04180046', 'CYP1A1: cg05549655', 'GFI1: cg14179389', 
+                            'Immune cell proportion (saliva)','Epithelial cell proportion (saliva)', 
+                            'Global methylation', 'AHHR: cg05575921', 'MYO1G: cg04180046', 'CYP1A1: cg05549655', 'GFI1: cg14179389', "MYO1G: cg22132788", 
                             pms_labels, gsub('no transform', 'z-score standardized', pms_labels), gsub('no transform', 'mean-centered', pms_labels), 
                             'ID', 'Visit',
                             'Horvath clock', 'SkinBlood clock', 'Hannum clock', 'Pediatric clock', 'Levine clock', 'PoAm clock 38', 'PoAm clock 45', 'GRIM clock')
@@ -135,14 +135,18 @@ if(nrow(betaqc)!=423668){
   set_label(methyldata)=methyl_labels_myclocks
 }
 
+
+
 #################################################checks
 summary(methyldata)
 #note the three missing clock ids when left joining to clocks. Also see above. needs to make a decision here about what to do 
 
 #load in complete case analysis
 load(paste0(datadir, '/CreatedData/completeCasepheno.Rdata'))
-completecase=left_join(completecase, methyldata%>%mutate(idnum=as.character(idnum)))
+completecase=left_join(completecase, methyldata%>%mutate(idnum=as.character(idnum)))%>%
+  mutate(childteen=case_when(childteen=='C'~'Age 9',childteen=='T'~'Age 15'))
 
+set_label(completecase$childteen)='Child age at saliva collection'
 
 #################################################save 
 save(methyldata, file=paste0(datadir, '/CreatedData/allmethyl.Rdata'))

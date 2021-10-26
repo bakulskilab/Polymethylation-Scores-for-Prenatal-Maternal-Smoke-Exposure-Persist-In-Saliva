@@ -6,7 +6,8 @@ library(tidyr)
 library(stringr)
 library(dplyr)
 library(purrr)
-library(tidydplyr::select)
+library(tidyverse)
+library(dplyr)
 library(sjlabelled)
 
 #directory based coding
@@ -120,6 +121,7 @@ FF_labeled=FF_labeled %>%
 #read in local and global pc data
 pc_files=list.files(path=paste0(datadir, "OGData/pcs"), pattern='*.csv', full.names=TRUE)
 names(pc_files)=gsub('.csv', '', list.files(path=paste0(datadir, "OGData/pcs"), pattern='*.csv'))
+names(pc_files)=paste0(str_to_title(names(pc_files)), ' ancestry')
 localpc=pc_files%>%map_dfr(read.csv, .id='ancestry')%>%rename_with(~str_c('local_', .), contains('PC'))
 allPC<-read.table(paste0(datadir, "OGData/pcs/global_pcs.txt"), col.names=c("X", "idnum", paste("global_PC", 1:20, sep='')))
 

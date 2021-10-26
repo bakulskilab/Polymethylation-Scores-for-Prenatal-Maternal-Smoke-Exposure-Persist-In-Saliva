@@ -64,7 +64,7 @@ library(lme4)
 library(lmerTest)
 library(ggpubr)
 data.dir="/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Files/"
-limma.out.dir<-file.path(data.dir, 'CreatedData', 'limmaModels')
+limma.out.dir<-file.path(datadir, 'CreatedData', 'limmaModels')
 outputdir<-"/scratch/bfoxman_root/bfoxman/blostein/FragileFamilies/Output"
 ```
 
@@ -473,7 +473,7 @@ dev.off()
 ```{r compare}
 AllModels<-c(child_models, teen_models)
 
-AllModelsdf<-AllModels %>% bind_rows(.id='ModelType')%>%mutate('Model'=gsub('.*_', '', ModelType), 'Age'=gsub('_.*', '', ModelType))
+
 
 AllModelsdf=AllModelsdf%>%group_by(Model, Age, ModelType)%>%nest()%>%mutate(TopCpGs=map(data, function(x) x %>%filter(P.Value<1e-3)%>%pull(CpG)))%>%mutate(ModelType=case_when(ModelType=='child_model1'~'Age 9: Model 1', ModelType=='child_model2'~'Age 9: Model 2', ModelType=='child_model3'~'Age 9: Model 3', ModelType=='teen_model1'~'Age 15: Model 1', ModelType=='teen_model2'~'Age 15: Model 2', ModelType=='teen_model3'~'Age 15: Model 3'))%>%mutate(ModelType=factor(ModelType, levels=c('Age 9: Model 1', 'Age 9: Model 2', 'Age 9: Model 3', 'Age 15: Model 1', 'Age 15: Model 2', 'Age 15: Model 3')))
 ```
@@ -513,6 +513,7 @@ sig_beta_pres<-plot_grid(d, e, f, ncol=3)
 ```{r teen beta vs child beta draw graph, figure.height=16, , fig.cap='Correlation between effect estimates from the three different epigenome wide linear models in children vs in teens for A) all CpGs and B) significant CpGs only'}
 plot_grid(all_beta, sig_beta, ncol=2, labels=c('A', 'B'), vjust = 0.8)
 ```
+
 ```{r save beta comparison}
 png(file.path(outputdir, 'BetaChildvsTeen.png'), width=1300, height=800)
 plot_grid(all_beta_pres+theme(text=element_text(size=16)), sig_beta_pres+theme(text=element_text(size=16)), ncol=1, labels=c('A', 'B'), vjust = 0.8)
