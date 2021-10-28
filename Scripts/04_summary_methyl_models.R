@@ -62,7 +62,7 @@ outcome_labels=c('Global methylation', 'Pediatric clock',
                  'Any smoking polymethylation score (newborns)', 
                  'Sustained smoking polymethylation score (newborns, cell-type controlled)', 
                  'Sustained smoking polymethylation score (older children)', 
-                 'AHHR: cg05575921')
+                 'AHRR: cg05575921')
 names(outcome_labels)=y_vector
 
 
@@ -239,7 +239,7 @@ modeldata_wide = modeldata%>%
   dplyr::select(any_of(c('idnum', 'ancestry', 'childteen', 'global_PC1', 
                          'global_PC2', 'local_PC1', 'local_PC2', 
                          'smkPreg_binaryN',  y_vector, 
-                         str_split(secondhand_model_vars,  '\\+')[[1]][-1])))%>%
+                         str_split(str_remove(secondhand_model_vars, 'ChildAgeComposite'),  '\\+')[[1]][-1])))%>%
   pivot_wider(names_from = childteen, values_from=any_of(c(y_vector, 'Leukocytes_saliva', 'Epithelial.cells_saliva', 'Sample_Plate', 'SmkAtVisitPastmonth')))
 
 #arguments

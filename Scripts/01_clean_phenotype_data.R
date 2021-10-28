@@ -123,11 +123,17 @@ id_list=list.files(path=paste0(datadir, "OGData/pcs"), pattern='*idnums*', full.
 id_list%>%map_dfr(read.table, .id='ancestry')
 
 
-pc_files=list.files(path=paste0(datadir, "OGData/pcs"), pattern='*.csv', full.names=TRUE)
-names(pc_files)=gsub('.csv', '', list.files(path=paste0(datadir, "OGData/pcs"), pattern='*.csv'))
-names(pc_files)=paste0(str_to_title(names(pc_files)), ' ancestry')
+pc_files=list.files(path=paste0(datadir, "OGData/pcs"), pattern='FFCWDNA_.*.csv', full.names=TRUE)
+names(pc_files)=gsub('.csv', '', list.files(path=paste0(datadir, "OGData/pcs"), pattern='FFCWDNA_.*.csv'))
+names(pc_files)=paste0(str_to_title(str_match(names(pc_files), '.*_(.*)_n.*')[,2]), ' ancestry')
 localpc=pc_files%>%map_dfr(read.csv, .id='ancestry')%>%rename_with(~str_c('local_', .), contains('PC'))
-allPC<-read.table(paste0(datadir, "OGData/pcs/global_pcs.txt"), col.names=c("X", "idnum", paste("global_PC", 1:20, sep='')))
+allPC<-read.table(paste0(datadir, "OGData/pcs/pcs_n50.eigenvec"), col.names=c("idnum", 'idnum2', paste("global_PC", 1:50, sep='')))
+
+old_pc=list.files(path=paste0(datadir, "OGData/pcs"), pattern='.*[n|c].csv', full.names=TRUE)
+names(old_pc)=gsub('.csv', '', list.files(path=paste0(datadir, "OGData/pcs"), pattern='FFCWDNA_.*.csv'))
+names(old_pc)=paste0(str_to_title(str_match(names(old_pc), '.*_(.*)_n.*')[,2]), ' ancestry')
+local_old=old_pc%>%map_dfr(read.csv, .id='ancestry')%>%rename_with(~str_c('local_', .), contains('PC'))
+checkPC=left_join(localpc, local_old%>%mutate(old_ancestry=ancestry)%>%dplyr::select(idnum, old_ancestry))
 
 #individuals in each ancestry specific pc group can be labeled as that ancestry for categorical ancestry variable 
 FF_labeled=FF_labeled %>% left_join(localpc%>%mutate(id=as.character(idnum))%>%dplyr::select(id, ancestry, contains('local_PC')))%>%
@@ -174,7 +180,7 @@ set_label(myFF)=c(get_label(myFF)[1:69], 'Has 450K Illumina chip data', 'Materna
                   'Any postnatal maternal smoking when child age 1 or 5', 'Postnatal maternal smoking dose when child age 1 or 5', 
                   'Ancestry categorization from child principal components of genetic data', 
                   paste0('Within ancestry strata principal component', 1:20), 
-                  paste0('Within all samples principal component', 1:20), 
+                  paste0('Within all samples principal component', 1:50), 
                   'Methylation data ID', 'Visit', 'ID', 'Batch', 'Slide', 'Array',
                   'sex_fromjonah', 'sex recode flag',
                   'Child age at visit', 'Maternal/primary care giver smoking in month prior to visit (pks/day)')
@@ -195,7 +201,7 @@ secondhandsmkdata<-prenatalexdata%>%filter_at(all_of(secondhandsmokevars), all_v
 child_smoke<-secondhandsmkdata %>% filter(k5f1l!= "2 no" & childteen=='C')
 child_nosmoke<-secondhandsmkdata %>% filter(k5f1l=="2 no" & childteen=='C')
 teen_smoke<-secondhandsmkdata %>% filter(k6d40!="2 No" & childteen=='T')
-teen_nosmoke<-secondhandsmkdata %>% filter(k6d40=="2 No" & childteen=='T')
+teen_nosmoke<-secondhandsmkdata %>% filter(k6d40=="2 No" & k5f1l!='1 yes' & childteen=='T')
 completecase<-rbind(child_nosmoke, teen_nosmoke)%>%copy_labels(basemodeldata)%>%copy_labels(myFF)
 
 fathersmkdata<-completecase %>% filter(f1g4!="Missing" & !is.na(f1g4))
