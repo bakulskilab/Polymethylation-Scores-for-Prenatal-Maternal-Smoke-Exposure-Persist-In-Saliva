@@ -8,6 +8,7 @@ output:
     df_print: paged
 bibliography: Methylation_SmokingBib.bib
 csl: springer-vancouver.csl
+always_allow_html: true
 ---
 
 ```{r, echo=F, include=F, warning=F, message=F}
