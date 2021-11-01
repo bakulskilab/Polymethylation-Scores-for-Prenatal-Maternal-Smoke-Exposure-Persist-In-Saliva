@@ -945,7 +945,7 @@ ggexport(volcs, filename=file.path(outdir, paste0('Figure', main_fig, '.pdf')))
 ggexport(volcs, filename=file.path(outdir, paste0('Figure', main_fig, '.png')))
 ```
 
-```{r, eval=stand_alone, fig.width=14, }
+```{r, eval=stand_alone, eval=include_ewas, fig.width=14, }
 volcs
 ```
 
@@ -1007,7 +1007,7 @@ comp_joubert=ggarrange(comp_nofilter, comp_filter, common.legend = F, labels=c('
 ggexport(comp_joubert, filename=file.path(outdir, paste0('SupplementalFigure', sup_fig, '.png')))
 ```
 
-```{r, eval=stand_alone, fig.width=14}
+```{r, eval=stand_alone, eval=include_ewas, fig.width=14}
 comp_joubert
 ```
 
@@ -1211,7 +1211,7 @@ ggexport(ancestry_differences, filename=file.path(outdir, paste0('SupplementalFi
 ggexport(ancestry_differences, filename=file.path(outdir, paste0('SupplementalFigure', sup_fig, '.png')))
 ```
 
-```{r, eval=stand_alone, fig.width=14}
+```{r, eval=stand_alone, eval=include_ewas, fig.width=14}
 ancestry_differences
 ```
 
@@ -1238,6 +1238,6 @@ plot_sharedCpG<-ggplot(cpg_all, aes(x=estimate, xmin=conf.low, xmax=conf.high, c
 ggexport(plot_sharedCpG, filename=file.path(outdir, paste0('SupplementalFigure', sup_fig, '.pdf')))
 ```
 
-```{r, eval=stand_alone, fig.width=14}
+```{r, eval=stand_alone, eval=include_ewas, fig.width=14}
 plot_sharedCpG
 ```

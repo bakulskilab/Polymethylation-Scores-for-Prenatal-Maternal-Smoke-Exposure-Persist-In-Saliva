@@ -18,4 +18,4 @@
 
 module load R/4.1.0
 
-R CMD BATCH --no-restore --no-save --quiet SVAAnalysis.R SVAAnalysis.out
+R CMD BATCH --no-restore --no-save --quiet /nfs/turbo/bakulski1/People/blostein/FF_methylation/Code/Scripts/03_sva_variables.R SVAAnalysis.out
