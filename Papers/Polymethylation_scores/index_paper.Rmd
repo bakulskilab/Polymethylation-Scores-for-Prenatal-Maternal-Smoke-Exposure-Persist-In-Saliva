@@ -1,7 +1,7 @@
 ---
-title: "Polymethylation scores paper"
-author: "F blostein"
-date: "9/13/2021"
+title: "PAPER DRAFT"
+author: "------------"
+date: "`r Sys.Date()`"
 output:
   word_document: default
   html_document:
@@ -41,6 +41,9 @@ results_run=str_detect(here::here(), 'nfs/turbo/bakulski1')
 ```
 
 ```{r child = here::here("Papers", "Polymethylation_scores", "98_declarations.Rmd")}
+```
+
+```{r child = here::here("Papers", "Polymethylation_scores", "99_FigureCaptions.Rmd"), eval=results_run}
 ```
 
 # References

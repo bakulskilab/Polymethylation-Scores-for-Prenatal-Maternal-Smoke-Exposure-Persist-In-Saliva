@@ -24,7 +24,6 @@ library(lmerTest)
 library(stringr)
 library(sva)
 #############
-#investigate why clocks have 1 fewer observation in child models
 ##################################Directories & data
 datadir="/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/CreatedData"
 outputdir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Output"
@@ -57,12 +56,16 @@ save(modeldata, file=file.path(datadir, file='completeCaseSVA.Rdata'))
 #################################Set variables for modeling
 #outcomes & outcome_labels
 
-y_vector<-c("globalmethylation", "pediatric", "anynewborn_center", "SSnewbornCT_center", "SSolder_center", "cg05575921")
+y_vector<-c("globalmethylation", "pediatric", "anynewborn_center_scale", 
+            "SSnewbornCT_center_scale", "SSnewborn_center_scale",  "SSolder_center_scale", 
+            "cg05575921", "cg04180046", "cg05549655", "cg14179389","cg22132788")
 outcome_labels=c('Global methylation', 'Pediatric clock',  
                  'Any smoking polymethylation score (newborns)', 
                  'Sustained smoking polymethylation score (newborns, cell-type controlled)', 
+                 'Sustained smoking polymethylation score (newborns)',
                  'Sustained smoking polymethylation score (older children)', 
-                 'AHRR: cg05575921')
+                 'AHRR: cg05575921', "MYO1G: cg04180046", "CYP1A1: cg05549655" ,  "GFI1: cg14179389" , "MYO1G: cg22132788")
+
 names(outcome_labels)=y_vector
 
 
@@ -191,16 +194,12 @@ modeldata=modeldata%>%mutate(smkPreg_binaryN=case_when(smkPreg_binary=='Yes'~1, 
 
 #global predictors, cross sectional
 roc_predictors=c('', gsub('~smkPreg_binary', '', paste0(base_model_vars, global_pcs)))
-roc_outcomes=c('', y_vector, 'cg05549655', 'cg22132788', 'SSnewborn_center')
+roc_outcomes=c('', y_vector)
 args=list('childteen'=age_vector, 'methylation'=roc_outcomes, 'covariates'=roc_predictors)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))%>%
   filter(predictors!='')
 
 
-methyl_names=data.frame(name_methyl=c('No methylation', 'Global methylation', 'Pediatric clock', 
-                                      'Any smoking (newborn)', 'Sustained smoking w/ cell type correction (newborn)', 
-                                      'Sustained smoking (older children)',
-                                      'AHRR: ch05575921', "CYP1A1: cg05549655", "MYO1G: cg22132788", 
-                                      'Sustained smoking (newborn)'), 
+methyl_names=data.frame(name_methyl=c('No methylation', outcome_labels), 
                         methylation=roc_outcomes)
 
 global_roc=modeldata%>%

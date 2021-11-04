@@ -1,17 +1,29 @@
 # Declarations
 
-## Ethics approval and consent to participate
+### Ethics approval and consent to participate
 
-## Consent for publication
+Participants provided written informed consent for the study. The data used in this manuscript were prepared by the Fragile Families and Childhood Wellbeing Study administrators following approval of the manuscript proposal. These secondary data analyses were approved by the University of Michigan Institutional Review Board (IRB, HUM00129826) 
+
+### Consent for publication
 
 Not applicable
 
-## Availability of data and materials
+### Availability of data and materials
 
-## Competing interests
+Many of the variables used in this analysis are publicly available in the Fragile Families dataset. Some of the data used in this analysis, including genetic and epigenetic data, is restricted use but available to researchers upon reasonable application. 
 
-## Funding
+### Competing interests
 
-## Authors' contributions
+The authors have no competing interests to declare. check here 
 
-## Acknowledgements
+### Funding
+
+This research was made possible through several grants (add). FB was supported by the National Institutes of Health National Institute of Dental and Craniofacial Research (F31DE029992). 
+
+### Authors' contributions
+
+FB performed the analysis with contributions from JD, JF, and EW. FB and KB wrote the paper with all authors contributing to revisions. DN, CM, KM, EW and FB all contributed to the design and conception of the study. 
+
+### Acknowledgements
+
+Not applicable 

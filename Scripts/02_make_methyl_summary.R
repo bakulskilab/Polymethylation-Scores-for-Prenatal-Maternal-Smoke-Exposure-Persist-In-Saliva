@@ -121,6 +121,7 @@ methyl_labels_myclocks=c('Methylation data ID', 'Epithelial cell proportion', 'F
                          'Immune cell proportion (saliva)','Epithelial cell proportion (saliva)', 
                          'Global methylation', 'AHHR: cg05575921', 'MYO1G: cg04180046', 'CYP1A1: cg05549655', 'GFI1: cg14179389', "MYO1G: cg22132788", 
                          pms_labels, gsub('no transform', 'z-score standardized', pms_labels), gsub('no transform', 'mean-centered', pms_labels), 
+                         #paste0(pms_labels, '/n (coefficients) & z-score standardized (score)'), gsub('no transform', '/n z-score standardized (coefficients) & z-score standardized (score)', pms_labels), gsub('no transform', '/n mean-centered (coefficients) & z-score standardized (score)', pms_labels),
                          'ID', 'Visit',
                          'Horvath clock', 'SkinBlood clock', 'Pediatric clock', 'PoAm clock 38', 'PoAm clock 45')
 
@@ -128,6 +129,7 @@ methyl_labels_jonahclocks=c('Methylation data ID', 'Epithelial cell proportion',
                             'Immune cell proportion (saliva)','Epithelial cell proportion (saliva)', 
                             'Global methylation', 'AHHR: cg05575921', 'MYO1G: cg04180046', 'CYP1A1: cg05549655', 'GFI1: cg14179389', "MYO1G: cg22132788", 
                             pms_labels, gsub('no transform', 'z-score standardized', pms_labels), gsub('no transform', 'mean-centered', pms_labels), 
+                            #paste0(pms_labels, '/n (coefficients) & z-score standardized (score)'), gsub('no transform', '/n z-score standardized (coefficients) & z-score standardized (score)', pms_labels), gsub('no transform', '/n mean-centered (coefficients) & z-score standardized (score)', pms_labels),
                             'ID', 'Visit',
                             'Horvath clock', 'SkinBlood clock', 'Hannum clock', 'Pediatric clock', 'Levine clock', 'PoAm clock 38', 'PoAm clock 45', 'GRIM clock', 'GRIM pack/yrs component')
 
@@ -148,6 +150,12 @@ summary(methyldata)
 load(paste0(datadir, '/CreatedData/completeCasepheno.Rdata'))
 completecase=left_join(completecase, methyldata%>%mutate(idnum=as.character(idnum)))%>%
   mutate(childteen=case_when(childteen=='C'~'Age 9',childteen=='T'~'Age 15'))
+
+#now zscore the polymethylation scores once we have the complete case dataset
+completecase=completecase%>%
+  mutate(across( anynewborn_notransform:SSolder_center, list(scale=scale)))
+
+set_label(completecase)=c(get_label(completecase)[1:188], paste0(pms_labels, '/n (coefficients) & z-score standardized (score)'), gsub('no transform', '/n z-score standardized (coefficients) & z-score standardized (score)', pms_labels), gsub('no transform', '/n mean-centered (coefficients) & z-score standardized (score)', pms_labels))
 
 set_label(completecase$childteen)='Child age at saliva collection'
 

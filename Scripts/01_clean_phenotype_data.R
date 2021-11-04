@@ -199,9 +199,11 @@ secondhandsmokevars<-c(prenatalexposurevar, "PostnatalMaternalSmokingAny", "SmkA
 secondhandsmkdata<-prenatalexdata%>%filter_at(all_of(secondhandsmokevars), all_vars(!(. %in% c("Missing")) & !is.na(.)))
 
 child_smoke<-secondhandsmkdata %>% filter(k5f1l!= "2 no" & childteen=='C')
-child_nosmoke<-secondhandsmkdata %>% filter(k5f1l=="2 no" & childteen=='C')
+#only children who report never cigarette use at age 9 OR were missing never cigarette at age 9 but reported no smoking at age 15
+child_nosmoke<-secondhandsmkdata %>% filter((k5f1l=="2 no" | (is.na(k5f1l) & k6d40=='2 No')) & childteen=='C')
 teen_smoke<-secondhandsmkdata %>% filter(k6d40!="2 No" & childteen=='T')
-teen_nosmoke<-secondhandsmkdata %>% filter(k6d40=="2 No" & k5f1l!='1 yes' & childteen=='T')
+#only children who report never smoking at age 15 AND were either missing or reported not smoking at age 9
+teen_nosmoke<-secondhandsmkdata %>% filter(k6d40=="2 No" & (k5f1l=='2 no' |  is.na(k5f1l)) & childteen=='T')
 completecase<-rbind(child_nosmoke, teen_nosmoke)%>%copy_labels(basemodeldata)%>%copy_labels(myFF)
 
 fathersmkdata<-completecase %>% filter(f1g4!="Missing" & !is.na(f1g4))
