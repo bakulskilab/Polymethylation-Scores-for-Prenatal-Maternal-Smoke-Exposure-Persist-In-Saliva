@@ -9,6 +9,7 @@ library(EpiDISH)
 library(ewastools)
 library(tidyr)
 library(purrr)
+library(tibble)
 library(sjlabelled)
 library(wateRmelon)
 library(data.table)
@@ -40,6 +41,21 @@ cell_types=left_join(estF_FF, estL_FF)
 ################################################global methylation
 globalmethy<-colMeans(betaqc, na.rm=T)
 globalmethdf<-data.frame("MethID"=names(globalmethy), "globalmethylation"=globalmethy)
+#add annotations for stratified methylation mean calculations
+library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+data(Locations)
+data(Islands.UCSC)
+data(Other)
+Locations <- Locations[rownames(betaqc), ]
+Islands.UCSC <- Islands.UCSC[rownames(betaqc),]
+Other <- Other[rownames(betaqc),]
+#list of regions
+isles=Islands.UCSC%>%as.data.frame()%>%mutate(Relation_to_Island=gsub('._', '', Relation_to_Island))%>%rownames_to_column('cpgs')%>%group_by(Relation_to_Island)%>%summarise(cpgs=list(cpgs))
+#mean methylation per region
+methyMean_regions=lapply(isles$cpgs, function(x) as.data.frame(colMeans(betaqc[x, ], na.rm=T)))
+methyMean_regions=methyMean_regions%>% bind_cols()%>%rownames_to_column('MethID')
+colnames(methyMean_regions)=c('MethID', paste0(isles$Relation_to_Island, '_mean'))
+globalmethdf=left_join(globalmethdf, methyMean_regions)
 
 #################################################apriori cpgs
 aprioriCGdf<-as.data.frame(t(betaqc[aprioriCG, ]))
@@ -119,7 +135,8 @@ pms_labels=c('Polymethylation score: coefficients for any smoking from newborn c
 
 methyl_labels_myclocks=c('Methylation data ID', 'Epithelial cell proportion', 'Fibroblast cel proportion', 'Immune cell proportion',
                          'Immune cell proportion (saliva)','Epithelial cell proportion (saliva)', 
-                         'Global methylation', 'AHHR: cg05575921', 'MYO1G: cg04180046', 'CYP1A1: cg05549655', 'GFI1: cg14179389', "MYO1G: cg22132788", 
+                         'Global methylation', 'Island methylation', 'Open Sea methylation', 'Shelf methylation', 'Shore methylation',
+                         'AHHR: cg05575921', 'MYO1G: cg04180046', 'CYP1A1: cg05549655', 'GFI1: cg14179389', "MYO1G: cg22132788", 
                          pms_labels, gsub('no transform', 'z-score standardized', pms_labels), gsub('no transform', 'mean-centered', pms_labels), 
                          #paste0(pms_labels, '/n (coefficients) & z-score standardized (score)'), gsub('no transform', '/n z-score standardized (coefficients) & z-score standardized (score)', pms_labels), gsub('no transform', '/n mean-centered (coefficients) & z-score standardized (score)', pms_labels),
                          'ID', 'Visit',
@@ -127,7 +144,8 @@ methyl_labels_myclocks=c('Methylation data ID', 'Epithelial cell proportion', 'F
 
 methyl_labels_jonahclocks=c('Methylation data ID', 'Epithelial cell proportion', 'Fibroblast cel proportion', 'Immune cell proportion',
                             'Immune cell proportion (saliva)','Epithelial cell proportion (saliva)', 
-                            'Global methylation', 'AHHR: cg05575921', 'MYO1G: cg04180046', 'CYP1A1: cg05549655', 'GFI1: cg14179389', "MYO1G: cg22132788", 
+                            'Global methylation', 'Island methylation', 'Open Sea methylation', 'Shelf methylation', 'Shore methylation',
+                            'AHHR: cg05575921', 'MYO1G: cg04180046', 'CYP1A1: cg05549655', 'GFI1: cg14179389', "MYO1G: cg22132788", 
                             pms_labels, gsub('no transform', 'z-score standardized', pms_labels), gsub('no transform', 'mean-centered', pms_labels), 
                             #paste0(pms_labels, '/n (coefficients) & z-score standardized (score)'), gsub('no transform', '/n z-score standardized (coefficients) & z-score standardized (score)', pms_labels), gsub('no transform', '/n mean-centered (coefficients) & z-score standardized (score)', pms_labels),
                             'ID', 'Visit',
@@ -150,12 +168,13 @@ summary(methyldata)
 load(paste0(datadir, '/CreatedData/completeCasepheno.Rdata'))
 completecase=left_join(completecase, methyldata%>%mutate(idnum=as.character(idnum)))%>%
   mutate(childteen=case_when(childteen=='C'~'Age 9',childteen=='T'~'Age 15'))
+ncolumns=ncol(completecase)
 
 #now zscore the polymethylation scores once we have the complete case dataset
 completecase=completecase%>%
   mutate(across( anynewborn_notransform:SSolder_center, list(scale=scale)))
 
-set_label(completecase)=c(get_label(completecase)[1:188], paste0(pms_labels, '/n (coefficients) & z-score standardized (score)'), gsub('no transform', '/n z-score standardized (coefficients) & z-score standardized (score)', pms_labels), gsub('no transform', '/n mean-centered (coefficients) & z-score standardized (score)', pms_labels))
+set_label(completecase)=c(get_label(completecase)[1:ncolumns], paste0(pms_labels, '/n (coefficients) & z-score standardized (score)'), gsub('no transform', '/n z-score standardized (coefficients) & z-score standardized (score)', pms_labels), gsub('no transform', '/n mean-centered (coefficients) & z-score standardized (score)', pms_labels))
 
 set_label(completecase$childteen)='Child age at saliva collection'
 
