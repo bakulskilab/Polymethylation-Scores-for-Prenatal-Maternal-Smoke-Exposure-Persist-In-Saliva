@@ -6,11 +6,37 @@ bibliography: Methylation_SmokingBib.bib
 always_allow_html: true
 ---
 
-# Figure 1 - Selection of samples from the Fragile Families and Child Wellbeing study into analytic subset. N represents the number of individuals at each step in the selection procedure, M represents the number of samples. Individuals with repeated measures can have more than one sample.
+```{r, echo=F, include=FALSE}
+print_figs=TRUE
+```
 
+#### Table 1: Bivariate associations between prenatal maternal smoking (no/yes) and selected DNA methylation summary measures and important covariates among a diverse sample of `r n_total` children in the Fragile Families and Child Wellbeing study
 
-# Figure 2 - Differences in selected DNA methylation summary measures by self-report of prenatal maternal smoking among `r n_total` children in the Fragile Families and Child Wellbeing study (CT=cell-type control)
+```{r,  eval=print_figs, include=T}
+smoking_tbl
+```
 
-# Figure 3 - Prental maternal smoke exposure is consistently associated with polymethylation scores at ages 9 and 15 and is portable across genetic ancestry groups in a sample of `r n_total` children in the Fragile Families and Child Wellbeing study 
+#### Figure 1 - Selection of samples from the Fragile Families and Child Wellbeing study into analytic subset. N represents the number of individuals at each step in the selection procedure, M represents the number of samples. Individuals with repeated measures can have more than one sample.
 
-# Figure 4 - A) Polymethylation scores accurately classify maternal report of prenatal smoke exposure status at ages 9 and 15 among a `r n_total` children in the Fragile Families and Child Wellbeing Study B) Inclusion of two-visits of DNA methylation data does not improve classification of maternal report of prenatal smoke exposure status among `r n_total` children in the Fragile Families and Child Wellbeing study 
+```{r, echo=F, eval=print_figs, include=T, fig.height=11, fig.width=7}
+graph1
+```
+
+#### Figure 2 - Differences in selected DNA methylation summary measures by self-report of prenatal maternal smoking among `r n_total` children in the Fragile Families and Child Wellbeing study (CT=cell-type control)
+
+```{r, echo=F, eval=print_figs, include=T, fig.height=5, fig.width=7}
+fig2
+```
+
+#### Figure 3 - Prental maternal smoke exposure is consistently associated with polymethylation scores at ages 9 and 15 and is portable across genetic ancestry groups in a sample of `r n_total` children in the Fragile Families and Child Wellbeing study
+
+```{r, echo=F, eval=print_figs, include=T, fig.width=12}
+forest_plot
+```
+
+#### Figure 4 - A) Polymethylation scores accurately classify maternal report of prenatal smoke exposure status at ages 9 and 15 among a `r n_total` children in the Fragile Families and Child Wellbeing Study B) Inclusion of two-visits of DNA methylation data does not improve classification of maternal report of prenatal smoke exposure status among `r n_total` children in the Fragile Families and Child Wellbeing study 
+
+```{r, echo=F, eval=print_figs, include=T,  fig.width=12}
+auc_fig
+```
+
