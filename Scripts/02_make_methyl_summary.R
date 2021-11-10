@@ -40,7 +40,7 @@ cell_types=left_join(estF_FF, estL_FF)
 
 ################################################global methylation
 globalmethy<-colMeans(betaqc, na.rm=T)
-globalmethdf<-data.frame("MethID"=names(globalmethy), "globalmethylation"=globalmethy)
+globalmethdf<-data.frame("MethID"=names(globalmethy), "globalmethylation"=globalmethy*100)
 #add annotations for stratified methylation mean calculations
 library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
 data(Locations)
@@ -53,12 +53,14 @@ Other <- Other[rownames(betaqc),]
 isles=Islands.UCSC%>%as.data.frame()%>%mutate(Relation_to_Island=gsub('._', '', Relation_to_Island))%>%rownames_to_column('cpgs')%>%group_by(Relation_to_Island)%>%summarise(cpgs=list(cpgs))
 #mean methylation per region
 methyMean_regions=lapply(isles$cpgs, function(x) as.data.frame(colMeans(betaqc[x, ], na.rm=T)))
+methyMean_regions=lapply(methyMean_regions, function(x) x*100)
 methyMean_regions=methyMean_regions%>% bind_cols()%>%rownames_to_column('MethID')
 colnames(methyMean_regions)=c('MethID', paste0(isles$Relation_to_Island, '_mean'))
 globalmethdf=left_join(globalmethdf, methyMean_regions)
 
 #################################################apriori cpgs
 aprioriCGdf<-as.data.frame(t(betaqc[aprioriCG, ]))
+aprioriCGdf=aprioriCGdf*100
 aprioriCGdf$MethID = colnames(betaqc)
 
 #################################################polymethylation scores

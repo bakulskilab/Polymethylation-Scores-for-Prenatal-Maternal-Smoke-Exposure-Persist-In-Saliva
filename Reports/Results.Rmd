@@ -55,7 +55,7 @@ library(xml2)
 library(ggrepel)
 
 include_ewas=F
-stand_alone=T
+stand_alone=F
 ```
 
 ```{r temp read n data}
@@ -180,7 +180,7 @@ n_TeenSmkexclusions<-paste0('n=', childdata %>% filter((k6d40=="1 Yes" | is.na(k
                             " individuals smoking \n or missing focal child smoking data \n at 15 year visit") 
 
 
-if(childdata %>% filter((childteen=='C' & k5f1l=='2 no') | (childteen=='T' & k6d40=='2 No' & k5f1l!='1 yes'))%>%nrow()!=nrow(modeldata)){stop('filter N and completecase data set N do not match')}
+if(childdata %>% filter(((k5f1l=="2 no" | (is.na(k5f1l) & k6d40=='2 No')) & childteen=='C') | (childteen=='T' & k6d40=="2 No" & (k5f1l=='2 no' |  is.na(k5f1l))))%>%nrow()!=nrow(modeldata)){stop('filter N and completecase data set N do not match')}
 
 
 ```
@@ -313,6 +313,11 @@ modeldata_wide = modeldata%>%
   pivot_wider(names_from = childteen, values_from=any_of(all_methyl))
 
 model_twovisit=modeldata_wide[complete.cases(modeldata_wide), ]
+
+modeldata_people=modeldata%>%
+  dplyr::select(any_of(c('idnum', 'ancestry', 'cm1bsex', 'ancestry', 
+                         'm1g2_YesNoPreg', 'm1g3_YesNoPreg', 'cm1inpov',
+                         'smkPreg_binary', 'PostnatalMaternalSmokingAny')))%>%unique()
 ```
 
 
