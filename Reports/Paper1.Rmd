@@ -3,13 +3,13 @@ title: "Supplemental Materials: Polymethylation Scores for Prenatal Maternal Smo
 author: "Freida A. Blostein^1, Jonah Fisher^2, John Dou^1, Lisa Schenper^3, Erin Ware^2 Daniel A. Notterman^3, Colter Mitchell^2, Kelly M. Bakulski^1"
 date: "`9/30/2021`r Sys.Date()`"
 output:
-  pdf_document: default
-  word_document: default
   html_document:
     code_folding: show
     highlight: tango
     number_sections: no
     theme: sandstone
+  word_document: default
+  pdf_document: default
 always_allow_html: true
 ---
 
@@ -70,6 +70,14 @@ load(paste0(datadir, '/CreatedData/methylation_summarymodels.Rdata'))
 
 ```{r plotting variables}
 theme_set(theme_bw())
+set_label(modeldata$cm1bsex)='Child gender'
+set_label(modeldata$cm1inpov)='Maternal income to poverty threshold (at baseline)'
+set_label(modeldata$PostnatalMaternalSmokingDose)='Primary caregiver smoking past month by dose'
+set_label(modeldata$SSnewbornCT_center)='Polymethylation score for smoke exposure'
+set_label(modeldata$pediatric)='Pediatric epigenetic clock (years)'
+set_label(modeldata$grim)='GRIM epigenetic clock (years)'
+set_label(modeldata$globalmethylation)='Percent global DNA methylation'
+set_label(modeldata$cg05575921)='AHRR gene: percent cg05575921 methylation'
 ```
 
 ```{r}
@@ -93,6 +101,7 @@ all_methyl_levels=c("SSnewbornCT_center", "SSnewborn_center",  "SSolder_center",
                                       "globalmethylation","Epithelial.cells_saliva", "Leukocytes_saliva")
 
 main_methyl_labels=modeldata%>%dplyr::select(any_of(main_methyl))%>%get_label()
+
 
 my_round=function(x, d){
   y=c()
@@ -276,7 +285,7 @@ main_fig=main_fig+1
 graph1
 ```
 
-# Supplemental Table `r sup_tab` - Descriptive statistics of excluded vs included samples with methylation data available from the Fragile and Families and Child Wellbeing study
+# Supplemental Table `r sup_tab` - Descriptive statistics of excluded vs included samples with methylation data available from the Fragile and Families and Child Wellbeing study. Samples excluded according to the flow diagram in Main Figure 1 
 
 ```{r supplemental table exclusions}
 myFF$MethylData2<-ifelse(myFF$MethID %in% modeldata$MethID, 'Final analysis group', 'Not in final analysis group')
@@ -287,10 +296,11 @@ myFF=myFF%>%mutate(across(c(PostnatalMaternalSmokingAny, SmkAtVisitPastmonth), ~
   mutate(ancestry=ifelse(ancestry=='Missing PC data', NA, ancestry))%>%copy_labels(myFF)
 
 exclusion_tbl=myFF %>% mutate(childteen=case_when(childteen=='C'~'Age 9', childteen=='T'~'Age 15'))%>%
-  dplyr::select(smkPreg_binary, m1g2_YesNoPreg, m1g3_YesNoPreg, cm1inpov, PostnatalMaternalSmokingAny,
-         SmkAtVisitPastmonth, ancestry, cm1bsex, childteen, globalmethylation, pediatric, grim,
-         Epithelial.cells_saliva, Leukocytes_saliva, SSnewbornCT_center, SSolder_center,
-         cg05575921, MethylData2)%>%
+    dplyr::select(smkPreg_binary, childteen, MethylData2, SSnewbornCT_center, cg05575921, pediatric, globalmethylation, Leukocytes_saliva, Epithelial.cells_saliva, ancestry, cm1bsex,  m1g2_YesNoPreg, m1g3_YesNoPreg, cm1inpov, PostnatalMaternalSmokingAny,SmkAtVisitPastmonth )%>%
+  mutate(smkPreg_binary=factor(smkPreg_binary, levels=c('No', 'Yes'), labels=c('Not exposed', 'Smoke exposed')), 
+         cm1bsex=factor(cm1bsex, levels=c('1 Boy', '2 Girl'), labels=c('Boy', 'Girl')))%>%
+  mutate(cm1bsex=set_label(cm1bsex, 'Child gender'), smkPreg_binary=set_label(smkPreg_binary, 'Prenatal maternal smoking'),
+         childteen=set_label(childteen, 'Age at DNA methylation sample'))%>%
   tbl_summary(., by=MethylData2, statistic=list(all_continuous()~"{mean} ({sd})"))%>%
   modify_header(stat_by = "**{level}**, M samples = {n}")%>%
   add_n(col_label='M samples')#%>%
@@ -320,7 +330,7 @@ modeldata_people=modeldata%>%
 ```
 
 
-# Supplemental Figure `r sup_fig` - Pearson correlation of methylation summary measures from an anlysis of M=`r m_obs` samples and N=`r n_total`children in the Fragile Families and Child Wellbeing cohort
+# Supplemental Figure `r sup_fig` - Pearson correlation of selected DNA methylation summary measures from an anlysis of M=`r m_obs` samples and N=`r n_total`children in the Fragile Families and Child Wellbeing cohort. Lower diaganol shows the Pearson rho correlation coefficient, upper triangle shows ellipses illustrating relationship between variables colored by the magnitude and direction of the correlation. 
 
 ```{r make supplemental figure correlation plot}
 library(Hmisc)
@@ -342,7 +352,7 @@ corrplot.mixed(res2, upper="ellipse", lower='number', order='hclust', tl.pos ="l
 
 ```
 
-# Supplemental Figure `r sup_fig` - Correlation between age 9 and age 15 visits for selected DNA methylation summary measures among `r n_twovisit` children with age 9 and age 15 visit data in the Fragile Families and Child Wellbeing study
+# Supplemental Figure `r sup_fig` - Correlation between age 9 and age 15 visit DNA methylation summary measures among `r n_twovisit` children with age 9 and age 15 visit data in the Fragile Families and Child Wellbeing study. Each point represents one individual, x-axis is the DNA methylation summary measure at age 9 and y-axis is the DNA methylation measure at age 15. Blue lines are simple linear regression lines of best fit, with Pearson rho and associated $P$ value shown. From top-left: Polymethylation score for prenatal maternal smoking, score created using coefficients from a regression of prenatal maternal smoking and DNA methylation in newborn cord blood, incorporating cell-type control. Polymethylation score for prenatal maternal smoking using coefficients from a regression of prenatal maternal smoking and DNA methylation in newborn cord blood, no cell-type control. Polymethylation score calculated using regression coefficients from a regression of prenatal maternal smoking and DNA methylation in older children's peripheral blood samples. Pediatric epigenetic clock (years). GRIM epigenetic clock (years). Percent DNA methylation at cg05575921 in AHRR. Percent global DNA methylation (mean across all DNA methylation sites in cleaned probe set). Proportion of epithelial cells calculated from DNA methylation using reference panel of children's saliva. Proportion of immune cells calculated from DNA methylation using a reference panel of children's saliva. 
 
 ```{r supplemental figure time correlation plot}
 age_long_methyl=modeldata%>%
@@ -374,7 +384,7 @@ sup_fig=sup_fig+1
 visit_cor
 ```
 
-# Supplemental Figure `r sup_fig`: Distributions of selected methylation summary measures at age 9 and age 15 among `r n_total` children in the Fragile Families and Child Wellbeing study
+# Supplemental Figure `r sup_fig`: Distributions of selected methylation summary measures at age 9 and age 15 among `r n_total` children in the Fragile Families and Child Wellbeing study. Captive box plots within violin plots show the distribution of selected DNA methylation measures in samples from age 9 (red) and age 15 (blue). Black lines show lines of best fit. From top-left: Polymethylation score for prenatal maternal smoking, score created using coefficients from a regression of prenatal maternal smoking and DNA methylation in newborn cord blood, incorporating cell-type control. Polymethylation score for prenatal maternal smoking using coefficients from a regression of prenatal maternal smoking and DNA methylation in newborn cord blood, no cell-type control. Polymethylation score calculated using regression coefficients from a regression of prenatal maternal smoking and DNA methylation in older children's peripheral blood samples. Pediatric epigenetic clock (years). GRIM epigenetic clock (years). Percent DNA methylation at cg05575921 in AHRR. Percent global DNA methylation (mean across all DNA methylation sites in cleaned probe set). Proportion of epithelial cells calculated from DNA methylation using reference panel of children's saliva. Proportion of immune cells calculated from DNA methylation using a reference panel of children's saliva. 
 
 ```{r supplemental figure methylation time distributions}
 dist_methyl=age_long_methyl%>%
@@ -427,18 +437,24 @@ fig2
 
 
 ```{r bivariate table}
+
 smoking_tbl=modeldata %>% 
-  dplyr::select(smkPreg_binary, m1g2_YesNoPreg, m1g3_YesNoPreg, cm1inpov, PostnatalMaternalSmokingAny,
-         SmkAtVisitPastmonth, ancestry, cm1bsex, globalmethylation, pediatric, Epithelial.cells_saliva,
-         Leukocytes_saliva, SSnewbornCT_center,  cg05575921, childteen)%>%
+  dplyr::select(smkPreg_binary, childteen, SSnewbornCT_center, cg05575921, pediatric, globalmethylation, Leukocytes_saliva, Epithelial.cells_saliva, ancestry, cm1bsex,  m1g2_YesNoPreg, m1g3_YesNoPreg, cm1inpov, PostnatalMaternalSmokingAny,SmkAtVisitPastmonth )%>%
+  mutate(smkPreg_binary=factor(smkPreg_binary, levels=c('No', 'Yes'), labels=c('Not exposed', 'Smoke exposed')), 
+         cm1bsex=factor(cm1bsex, levels=c('1 Boy', '2 Girl', labels=c('Boy', 'Girl'))))%>%
   tbl_strata(strata=childteen, .tbl_fun=~.x %>%
                tbl_summary(by=smkPreg_binary, statistic=
                              list(all_continuous()~"{mean} ({sd})"))%>%
                add_n()%>%add_p(test=list(all_continuous()~"t.test")))
 
+
 smoking_tbl=smoking_tbl%>%as_gt()%>%
-  tab_row_group(label='Maternal', rows = 1:10)%>%
-  tab_row_group(label='Child', rows=11:23)
+  tab_row_group(label='Child characteristics', rows = 1:13)%>%
+  tab_row_group(label='Maternal characteristics', rows=14:23)%>%
+     row_group_order(
+      groups = c("Child characteristics", "Maternal characteristics")
+    )
+
 
 
 
@@ -449,7 +465,7 @@ main_tab=main_tab+1
 smoking_tbl
 ```
 
-# Supplemental Table `r sup_tab`:  Bivariate associations between prenatal maternal smoking (no/yes) and additional DNA methylation summary measures  among a diverse sample of `r n_total` children in the Fragile Families and Child Wellbeing study
+# Supplemental Table `r sup_tab`:  Bivariate associations between prenatal maternal smoking and additional DNA methylation summary measures among a diverse sample of `r n_total` children in the Fragile Families and Child Wellbeing study. Percent DNA methylation shown calculated across all DNA methylation sites available (global DNA methylation) and stratified by genomic region (Island, Open Sea, Shelf, Shore). Polymethylation score for smoke exposure from main analysis and from sensitivity analyses where scores were calculated using alternative available regression coefficients. 
 
 ```{r supplemental table additional methylation measures}
 smoking_tbl_extendedMeth=modeldata %>% 
@@ -457,6 +473,7 @@ smoking_tbl_extendedMeth=modeldata %>%
                 pediatric, grim, DNAmPACKYRS, Epithelial.cells_saliva, Leukocytes_saliva,
                 SSnewbornCT_center, SSnewborn_center, SSolder_center, anynewborn_center,
                 matches('cg'),  childteen)%>%
+    mutate(smkPreg_binary=factor(smkPreg_binary, levels=c('No', 'Yes'), labels=c('Not exposed', 'Smoke exposed')))%>%
   tbl_strata(strata=childteen, .tbl_fun=~.x %>%
                tbl_summary(by=smkPreg_binary, statistic=
                              list(all_continuous()~"{mean} ({sd})"))%>%
@@ -511,7 +528,8 @@ main_fig=main_fig+1
 forest_plot
 ```
 
-# Supplemental Figure `r sup_fig`: Sensitivity analyses for controlling for different variable sets in multivariable analyses of prenatal maternal smoking and DNA methylation summary measures
+# Supplemental Figure `r sup_fig`: Sensitivity analyses for controlling for different variable sets in multivariable analyses of prenatal maternal smoking and DNA methylation summary measures. Base model: Child sex, maternal income to poverty ratio, immune cell proportion, plate, 1st two principal components from PCA on child genetic data, child age. Prenatal exposures model: base model + yes/no any prenatal maternal alcohol use, yes/no any prenatal other drug use. Secondhand smoking models: prenatal exposures model + yes/no any postnatal maternal/primary care giver smoking at age 1 or 5, pk/day in month prior to primary caregiver/maternal interview at age 9 or 15. Surrogate variable: including all surrogate variables
+
 
 ```{r supplemental figure all models forest}
 #with(modeldata, table(ancestry, PostnatalMaternalSmokingAny, smkPreg_binary))%>%kbl()
@@ -536,11 +554,11 @@ ggexport(forest_plot_compareModels, filename=file.path(outdir, paste0('Supplemen
 sup_fig=sup_fig+1
 ```
 
-```{r, eval=as_supp, fig.width=14, fig.height=10}
+```{r, eval=as_supp, fig.width=14, fig.height=12}
 forest_plot_compareModels
 ```
 
-# Supplemental Figure `r sup_fig` DNA methylation summary measures across prenatal and postnatal exposures
+# Supplemental Figure `r sup_fig` DNA methylation summary measures across combinations of exposure to prenatal and postnatal  maternal smoking. Sample size is shown at the bottom of violin plots with captured boxplots. POlymethylation score shown in top facets, percent DNA methylation at cg05575921 in AHRR gene shown in bottom facets, age 9 samples shown in left facets, age 15 shown in right facets
 
 ```{r supplemental figure pre post smoke exposure}
 
@@ -586,11 +604,15 @@ sup_fig=sup_fig+1
 dna_prepost
 ```
 
-# Supplemental Figure `r sup_fig`: Surrogate variable associations with known covariates
+# Supplemental Figure `r sup_fig`: Heatmap of *P* values from Pearson correlations between known covariates and surrogate variables from surrogate variable models
 
 ```{r surrogate variables heatmap}
 #bring the heatmap function
 covar=c('Sample_Plate', 'Slide', 'Array', 'cm1bsex', 'smkPreg_binary', 'childteen', 'ancestry')
+modeldata$Sample_Plate=set_label(modeldata$Sample_Plate, 'Batch')
+modeldata$cm1bsex=set_label(modeldata$cm1bsex, 'Child gender')
+modeldata$PostnatalMaternalSmokingAny=set_label(modeldata$PostnatalMaternalSmokingAny, 'Postnatal maternal smoking (age 1 & 5)')
+modeldata$SmkAtVisitPastmonth=set_label(modeldata$SmkAtVisitPastmonth, 'Postnatal maternal smoking (month prior to DNA methylation sample')
 
 bring.the.heatmap.sv <- function(pd,covar,folder){
   
@@ -685,7 +707,7 @@ regression_table_ancestry_svs
 ```
 
 
-# Supplemental Table `r sup_tab`: Associations between prenatal maternal smoking and DNA methylation summary measures in multivariable linear models stratified by age or in multivariable linear mixed effect models among `r n_total` US children
+# Supplemental Table `r sup_tab`: Associations between prenatal maternal smoking and DNA methylation summary measures in multivariable linear models stratified by age or in multivariable linear mixed effect models among `r n_total` US children. All models controlled for:  first two principal components of child genetic ancestry (recalculated within ancestry strata for stratified models), child sex, maternal income-to-poverty ratio at birth, immune cell proportion estimated from methylation data, child age
 
 ```{r supplemental table age and linear mixed effect}
 #my_main_outcomes=c('AHRR: cg05575921', 'Sustained smoking polymethylation score (newborns, cell-type controlled)', 'Sustained smoking polymethylation score (older children)', 'Pediatric clock', 'Global methylation')
@@ -714,7 +736,7 @@ sup_tab=sup_tab+1
 regression_table_age
 ```
 
-# Supplemental Table `r sup_tab`: Associations between prenatal maternal smoking and DNA methylation summary measures in multivariable models among `r n_total` US children by ancestry using linear mixed effect models
+# Supplemental Table `r sup_tab`: Associations between prenatal maternal smoking and DNA methylation summary measures in multivariable models among `r n_total` US children by ancestry using linear mixed effect models. All models controlled for:  first two principal components of child genetic ancestry (recalculated within ancestry strata for stratified models), child sex, maternal income-to-poverty ratio at birth, immune cell proportion estimated from methylation data, child age
 
 ```{r supplemental table by ancestry using linear mixed effect models}
 test=rbind(longitudinal_global_models %>% mutate(ancestry='Unstratified'),
@@ -739,7 +761,8 @@ sup_tab=sup_tab+1
 regression_table_ancestry
 ```
 
-# Supplemental Figure `r sup_fig`: Associations between prenatal maternal smoking and polymethylation scores calculated using alternative coefficient sets among `n n_total` children in the Fragile Families and Child Wellbeing study 
+# Supplemental Figure `r sup_fig`: Associations between prenatal maternal smoking and polymethylation scores calculated using alternative coefficient sets among `n n_total` children in the Fragile Families and Child Wellbeing study. Base model: Child sex, maternal income to poverty ratio, immune cell proportion, plate, 1st two principal components from PCA on child genetic data, child age. Prenatal exposures model: base model + yes/no any prenatal maternal alcohol use, yes/no any prenatal other drug use. Secondhand smoking models: prenatal exposures model + yes/no any postnatal maternal/primary care giver smoking at age 1 or 5, pk/day in month prior to primary caregiver/maternal interview at age 9 or 15. Surrogate variable: including all surrogate variables
+
 
 ```{r supplemental figure compare across pms coefficients} 
  compare_pms=all_models%>%
@@ -751,7 +774,7 @@ regression_table_ancestry
  ggplot(aes(x=estimate, xmin=conf.low, xmax=conf.high, color=factor(age, rev(levels(age))), y=outcome))+
     geom_point(position = position_dodge(width = 1))+
     geom_errorbarh(height=0.1, position = position_dodge(width = 1))+
-    facet_grid(predictors~ancestry, scales='free_x')+
+    facet_wrap(predictors~., scales='free_x')+
     geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+
     theme_classic()+
   scale_color_discrete(name='')+scale_x_continuous("Estimate (95% CI)")+scale_y_discrete('')
@@ -761,7 +784,7 @@ sup_fig=sup_fig+1
 
 ```
 
-```{r compare across pms print, eval=as_supp, fig.width=10}
+```{r compare across pms print, eval=as_supp, fig.width=10, fig.height=12}
 compare_pms
 ```
 
@@ -769,7 +792,7 @@ compare_pms
 
 ```{r supplemental figure compare to top cpgs}
 topCPGs<-read.csv(paste0(datadir, "/TopCpGsWiklundEtAl2019.csv"))
-topCPGs<-topCPGs %>% mutate(estimate=as.numeric(gsub("−\\s", "-", gsub(" .*", "", β..SE.))), std.error=as.numeric(sub("\\).*", "", sub(".*\\(", "", β..SE.))), p.value=P.value, source="Wiklund et al. 2019", conf.low=(estimate-1.96*std.error), conf.high=(estimate+1.96*std.error), set ='')%>%dplyr::select(CpG, Chr, Position, Gene, estimate, std.error, p.value, conf.low, conf.high, source, set)
+topCPGs<-topCPGs %>% mutate(estimate=as.numeric(gsub("−\\s", "-", gsub(" .*", "", β..SE.))), std.error=as.numeric(sub("\\).*", "", sub(".*\\(", "", β..SE.))), p.value=P.value, source="Wiklund et al. 2019", conf.low=(estimate-1.96*std.error), conf.high=(estimate+1.96*std.error), set ='')%>%dplyr::select(CpG, Chr, Position, Gene, estimate, std.error, p.value, conf.low, conf.high, source, set)%>%mutate(estimate=estimate*100, conf.low=100*conf.low, conf.high=100*conf.high)
 
 #read in Joubert meta top cpgs 
 #read in cpgs from PMC4833289
@@ -783,7 +806,7 @@ names(cpgs)<-header2
 #four meta-EWASes: SS_newborn (sustained smoking in newborns); SS_newbornCT (sustained smoking in newborns controlling for cell type) SS_older (sustained smoking in older children); any_newborn (any smoking in newborns)
 #pivot_longer to get single column of coefs and a column for the analysis type
 #and group into a list by analysis type
-cpgs<-cpgs %>% pivot_longer(cols = c(matches("_Coef|_SE|_P|_FDR|_Direction")), names_to = c("set", ".value"), names_pattern="(.+)_(.+)")%>%rename_with(~gsub('_', '', .x))%>%mutate(Gene=`Mapped Gene`, estimate=Coef, conf.low=estimate-1.96*SE, conf.high=estimate+1.96*SE, source='Joubert et al. 2016', std.error=SE, p.value=P, Chr=CHR) %>%mutate(source=paste0(source, ': ', set))%>%dplyr::select(CpG, Chr, Position, Gene, estimate, std.error, p.value, conf.low, conf.high, source, set)%>%filter(set %in% c('SSolder', 'SSnewbornCT'))
+cpgs<-cpgs %>% pivot_longer(cols = c(matches("_Coef|_SE|_P|_FDR|_Direction")), names_to = c("set", ".value"), names_pattern="(.+)_(.+)")%>%rename_with(~gsub('_', '', .x))%>%mutate(Gene=`Mapped Gene`, estimate=Coef, conf.low=(estimate-1.96*SE), conf.high=(estimate+1.96*SE), source='Joubert et al. 2016', std.error=SE, p.value=P, Chr=CHR) %>%mutate(source=paste0(source, ': ', set))%>%dplyr::select(CpG, Chr, Position, Gene, estimate, std.error, p.value, conf.low, conf.high, source, set)%>%filter(set %in% c('SSolder', 'SSnewbornCT'))%>%mutate(estimate=estimate*100, conf.low=100*conf.low, conf.high=100*conf.high)
 
 myCpGs=all_models%>%filter(str_detect(outcome, 'cg') & predictors=='base model')%>%unnest(tidied)%>%filter(term=='smkPreg_binaryYes')%>%
     filter(ancestry=='Unstratified')%>%mutate(CpG=gsub( '.*: ', '', outcome), Gene=gsub(':.*', '', outcome), source=paste0('Fragile Families:', age))
@@ -797,7 +820,7 @@ cpg_all<-rbind(myCpGs%>%filter(CpG %in% top_cpgs), cpgs%>%filter(CpG %in% top_cp
 blank_data <- cpg_all %>%dplyr::select(Gene, CpG, estimate, std.error)%>%group_by(Gene)%>%mutate(min=min(estimate), max=max(as.numeric(std.error), na.rm=T))%>%dplyr::select(-estimate, -std.error)%>%unique()%>%mutate(estimate=min*-1+max, conf.high=estimate, conf.low=estimate)%>%dplyr::select(-max, -min)%>%arrange(Gene)%>%mutate(source='Wiklund et al. 2019')
 
 
-blank_data2 <- cpg_all %>%dplyr::select(Gene, CpG, estimate, std.error)%>%group_by(Gene)%>%mutate(min=min(estimate))%>%dplyr::select(-estimate, -std.error)%>%unique()%>%mutate(estimate=min*-1+0.005, conf.high=estimate, conf.low=estimate)%>%dplyr::select(-min)%>%arrange(Gene)%>%mutate(source='Fragile Families: Age_9')
+blank_data2 <- cpg_all %>%dplyr::select(Gene, CpG, estimate, std.error)%>%group_by(Gene)%>%mutate(min=min(estimate))%>%dplyr::select(-estimate, -std.error)%>%unique()%>%mutate(estimate=min*-1, conf.high=estimate, conf.low=estimate)%>%dplyr::select(-min)%>%arrange(Gene)%>%mutate(source='Fragile Families: Age_9')
 
 plot_aprioriCpG<-ggplot(cpg_all, aes(x=estimate, xmin=conf.low, xmax=conf.high, color=source, y=CpG))+geom_point(position=position_dodge(width=1))+geom_errorbarh(height=0.1, position=position_dodge(width=1))+scale_x_continuous()+geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+facet_wrap(.~Gene, scales='free', ncol=2)+theme_classic()+theme(legend.position = 'bottom')+guides(color=guide_legend(nrow=4,byrow=TRUE))+geom_blank(data = blank_data, aes(x = estimate))+scale_color_discrete('', labels=c('Fragile families saliva: age 15', 'Fragile families saliva: age 9', 'Fragile families: mixed effect model', 'Joubert et al. 2016 newborn cord blood', 'Joubert et al. 2016 peripheral blood older children', 'Wicklund et al. peripheral blood >16 years'))+scale_x_continuous('Estimate (95% CI)')
 
@@ -839,7 +862,7 @@ fig4b=global_roc%>%
                  & covariates!='')%>%
           unnest(test))%>%
   ggplot(aes(x=spec, y=sens, color=childteen, linetype=childteen))+geom_line(size=2)+
-  facet_wrap(~methylation, labeller = labeller(methylation=c('SSnewbornCT_center_scale'='Polymethylation score, \n newborn mean centered')))+
+  facet_wrap(~methylation, labeller = labeller(methylation=c('SSnewbornCT_center_scale'='Polymethylation score')))+
   theme_classic()+theme(legend.position = 'right')+guides(color=guide_legend(nrow=4,byrow=TRUE))+
   geom_abline(intercept=1, slope=-1, color='black')+
   scale_color_grey('', labels=c('Age 9 only', 'Age 9 & 15', 'Age 15 only'))+
@@ -847,22 +870,22 @@ fig4b=global_roc%>%
   xlab('Specificity')+ylab('Sensitivity')+
   theme(legend.position='bottom')+ coord_fixed()
 
-auc_fig=cowplot::plot_grid(fig4a, fig4b, labels=c('A', 'B'), nrow=1, rel_widths=c(0.65, 0.35), align='h', axis='tb')
+auc_fig=cowplot::plot_grid(fig4a, fig4b, labels=c('A', 'B'), nrow=1, rel_widths=c(0.63, 0.37), align='h', axis='tb')
 
 ggexport(auc_fig, filename=file.path(outdir, paste0('Figure', main_fig, '.pdf')), width=9)
 main_fig=main_fig+1
 ```
 
-```{r main figure 4 auc print, eval=stand_alone, fig.width=10}
+```{r main figure 4 auc print, eval=stand_alone, fig.width=12}
 auc_fig
 ```
 
-# Supplemental Table `r sup_tab`: Area under the curve for models shown in Main Figure 4 for classifying prenatal maternal smoke exposure, with *P* value when comparing to base model only or to model using polymethylation score only 
+# Supplemental Table `r sup_tab`: Area under the curve for models shown in Main Figure 4 for classifying prenatal maternal smoke exposure, with *P* value when comparing to base model only or to model using polymethylation score + base model. Base model: Child sex, maternal income to poverty ratio, immune cell proportion, plate, 1st two principal components from PCA on child genetic data, child age.  
 
 ```{r supplemental table auc}
 roc_table=global_roc %>% dplyr::select(childteen, methylation, modeltype, roc, auc)
 roc_base=roc_table %>% filter(modeltype=='Base model+No methylation')%>%mutate(roc_basemodel=roc)%>%dplyr::select(childteen, roc_basemodel)
-roc_ss=roc_table %>% filter(modeltype=='Sustained smoking polymethylation score (newborns, cell-type controlled)')%>%mutate(roc_pms=roc)%>%dplyr::select(childteen, roc_pms)
+roc_ss=roc_table %>% filter(modeltype=='Base model+Sustained smoking polymethylation score (newborns, cell-type controlled)')%>%mutate(roc_pms=roc)%>%dplyr::select(childteen, roc_pms)
 
 
 rct1=roc_table%>% 
@@ -880,10 +903,10 @@ sup_tab=sup_tab+1
 ```
 
 ```{r supplemental table auc print, eval=as_supp}
-rct1%>%kbl(col.names=c('Age', 'Model', 'AUC', 'P value vs base model', 'P value vs polymethylation score'))
+rct1%>%kbl(col.names=c('Age', 'Model', 'AUC', 'P value vs base model', 'P value vs base model + polymethylation score'))
 ```
 
-# Supplemental Table `r sup_tab`: Area under the curve when using different coefficient sets to construct polymethylation scores for predicting prenatal maternal smoke exposure
+# Supplemental Table `r sup_tab`: Area under the curve when using different coefficient sets to construct polymethylation scores for predicting prenatal maternal smoke exposure. With *P* value when comparing to base model only or to model using polymethylation score + base model. Base model: Child sex, maternal income to poverty ratio, immune cell proportion, plate, 1st two principal components from PCA on child genetic data, child age.  
 
 ```{r supplemental table auc other coefficients} 
 rct2=roc_table%>% 
@@ -899,7 +922,7 @@ rct2=roc_table%>%
 ```
 
 ```{r supplemental table auc other coefficients print, eval=as_supp}
-rct2%>%kbl(col.names=c('Age', 'Model', 'AUC', 'P value vs base model', 'P value vs polymethylation score with cell-type control'))
+rct2%>%kbl(col.names=c('Age', 'Model', 'AUC', 'P value vs base model', 'P value vs base model + polymethylation score with cell-type control'))
 ```
 
 
