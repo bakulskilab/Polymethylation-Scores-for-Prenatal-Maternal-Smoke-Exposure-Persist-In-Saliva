@@ -55,7 +55,7 @@ library(xml2)
 library(ggrepel)
 
 as_supp=T
-stand_alone=F
+stand_alone=T
 ```
 
 ```{r temp read n data}
@@ -68,17 +68,6 @@ load(paste0(datadir, '/CreatedData/completeCaseSVA.Rdata'))
 load(paste0(datadir, '/CreatedData/methylation_summarymodels.Rdata'))
 ```
 
-```{r plotting variables}
-theme_set(theme_bw())
-set_label(modeldata$cm1bsex)='Child gender'
-set_label(modeldata$cm1inpov)='Maternal income to poverty threshold (at baseline)'
-set_label(modeldata$PostnatalMaternalSmokingDose)='Primary caregiver smoking past month by dose'
-set_label(modeldata$SSnewbornCT_center)='Polymethylation score for smoke exposure'
-set_label(modeldata$pediatric)='Pediatric epigenetic clock (years)'
-set_label(modeldata$grim)='GRIM epigenetic clock (years)'
-set_label(modeldata$globalmethylation)='Percent global DNA methylation'
-set_label(modeldata$cg05575921)='AHRR gene: percent cg05575921 methylation'
-```
 
 ```{r}
 modeldata=modeldata %>% mutate(childteen=factor(childteen, levels=c('Age 9', 'Age 15')))%>%droplevels()
@@ -122,6 +111,20 @@ main_fig=1
 sup_fig=1
 main_tab=1
 sup_tab=1
+```
+
+```{r plotting variables}
+theme_set(theme_bw())
+set_label(modeldata$cm1bsex)='Child gender'
+set_label(modeldata$cm1inpov)='Maternal income to poverty threshold (at baseline)'
+set_label(modeldata$PostnatalMaternalSmokingDose)='Primary caregiver smoking past month by dose'
+set_label(modeldata$SSnewbornCT_center)='Polymethylation score for smoke exposure'
+set_label(modeldata$pediatric)='Pediatric epigenetic clock (years)'
+set_label(modeldata$grim)='GRIM epigenetic clock (years)'
+set_label(modeldata$globalmethylation)='Percent global DNA methylation'
+set_label(modeldata$cg05575921)='AHRR gene: percent cg05575921 methylation'
+set_label(modeldata$PostnatalMaternalSmokingAny)='Postnatal maternal smoking at ages 1 or 5'
+set_label(modeldata$SmkAtVisitPastmonth)='Postnatal primary caregiver smoking in past month prior to visit'
 ```
 
 ```{r figure 1, eval=T}
@@ -441,7 +444,9 @@ fig2
 smoking_tbl=modeldata %>% 
   dplyr::select(smkPreg_binary, childteen, SSnewbornCT_center, cg05575921, pediatric, globalmethylation, Leukocytes_saliva, Epithelial.cells_saliva, ancestry, cm1bsex,  m1g2_YesNoPreg, m1g3_YesNoPreg, cm1inpov, PostnatalMaternalSmokingAny,SmkAtVisitPastmonth )%>%
   mutate(smkPreg_binary=factor(smkPreg_binary, levels=c('No', 'Yes'), labels=c('Not exposed', 'Smoke exposed')), 
-         cm1bsex=factor(cm1bsex, levels=c('1 Boy', '2 Girl', labels=c('Boy', 'Girl'))))%>%
+         cm1bsex=factor(cm1bsex, levels=c('1 Boy', '2 Girl'), labels=c('Boy', 'Girl')))%>%
+    mutate(cm1bsex=set_label(cm1bsex, 'Child gender'), smkPreg_binary=set_label(smkPreg_binary, 'Prenatal maternal smoking'),
+         childteen=set_label(childteen, 'Age at DNA methylation sample'))%>%
   tbl_strata(strata=childteen, .tbl_fun=~.x %>%
                tbl_summary(by=smkPreg_binary, statistic=
                              list(all_continuous()~"{mean} ({sd})"))%>%
