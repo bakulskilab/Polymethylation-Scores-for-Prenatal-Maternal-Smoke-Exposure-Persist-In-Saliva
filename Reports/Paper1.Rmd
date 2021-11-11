@@ -66,13 +66,25 @@ load(paste0(datadir, '/CreatedData/allPhenoData.Rdata'))
 load(paste0(datadir, '/CreatedData/allmethyl.Rdata'))
 load(paste0(datadir, '/CreatedData/completeCaseSVA.Rdata'))
 load(paste0(datadir, '/CreatedData/methylation_summarymodels.Rdata'))
+modeldata=modeldata %>% mutate(childteen=factor(childteen, levels=c('Age 9', 'Age 15')))%>%droplevels()%>%copy_labels(modeldata)
 ```
 
+```{r plotting variables}
+theme_set(theme_bw())
+set_label(modeldata$cm1bsex)='Child gender'
+set_label(modeldata$cm1inpov)='Maternal income to poverty threshold (at baseline)'
+set_label(modeldata$PostnatalMaternalSmokingDose)='Primary caregiver smoking past month by dose'
+set_label(modeldata$SSnewbornCT_center)='Polymethylation score for smoke exposure'
+set_label(modeldata$pediatric)='Pediatric epigenetic clock (years)'
+set_label(modeldata$grim)='GRIM epigenetic clock (years)'
+set_label(modeldata$globalmethylation)='Percent global DNA methylation'
+set_label(modeldata$cg05575921)='AHRR gene: \n percent cg05575921 methylation'
+set_label(modeldata$PostnatalMaternalSmokingAny)='Postnatal maternal smoking at ages 1 or 5'
+set_label(modeldata$SmkAtVisitPastmonth)='Postnatal primary caregiver smoking in past month prior to visit'
+set_label(modeldata$childteen)='Visit of DNA methylation measure'
+```
 
 ```{r}
-modeldata=modeldata %>% mutate(childteen=factor(childteen, levels=c('Age 9', 'Age 15')))%>%droplevels()
-set_label(modeldata$childteen)='Visit'
-
 n_total=modeldata %>% dplyr::select(id)%>%unique()%>%nrow()
 m_obs=modeldata%>%nrow()
 n_twovisit=modeldata %>% group_by(id)%>%summarise(n=n())%>%filter(n==2)%>%nrow()
@@ -113,19 +125,7 @@ main_tab=1
 sup_tab=1
 ```
 
-```{r plotting variables}
-theme_set(theme_bw())
-set_label(modeldata$cm1bsex)='Child gender'
-set_label(modeldata$cm1inpov)='Maternal income to poverty threshold (at baseline)'
-set_label(modeldata$PostnatalMaternalSmokingDose)='Primary caregiver smoking past month by dose'
-set_label(modeldata$SSnewbornCT_center)='Polymethylation score for smoke exposure'
-set_label(modeldata$pediatric)='Pediatric epigenetic clock (years)'
-set_label(modeldata$grim)='GRIM epigenetic clock (years)'
-set_label(modeldata$globalmethylation)='Percent global DNA methylation'
-set_label(modeldata$cg05575921)='AHRR gene: percent cg05575921 methylation'
-set_label(modeldata$PostnatalMaternalSmokingAny)='Postnatal maternal smoking at ages 1 or 5'
-set_label(modeldata$SmkAtVisitPastmonth)='Postnatal primary caregiver smoking in past month prior to visit'
-```
+
 
 ```{r figure 1, eval=T}
 #function
@@ -343,15 +343,15 @@ res2<-modeldata%>%dplyr::select(any_of(all_methyl))%>%cor()
 colnames(res2)=all_methyl_labels
 rownames(res2)=all_methyl_labels
 
-pdf(file.path(outdir, paste0('SupplementalFigure', sup_fig, '.pdf')))
-corrplot.mixed(res2, upper="ellipse", lower='number', order='hclust', tl.pos ="lt", tl.cex=0.8)
+pdf(file.path(outdir, paste0('SupplementalFigure', sup_fig, '.pdf')), width=12)
+corrplot.mixed(res2, upper="ellipse", lower='number', order='hclust', tl.pos ="lt", tl.cex=0.8, number.cex= 7/ncol(res2))
 dev.off()
 
 sup_fig=sup_fig+1
 ```
 
 ```{r supplemental correlation plot plot it , eval=as_supp, fig.width=12, fig.height=12}
-corrplot.mixed(res2, upper="ellipse", lower='number', order='hclust', tl.pos ="lt", tl.cex=0.8)
+corrplot.mixed(res2, upper="ellipse", lower='number', order='hclust', tl.pos ="lt", tl.cex=0.8, number.cex= 7/ncol(res2))
 
 ```
 
@@ -496,7 +496,7 @@ smoking_tbl_extendedMeth
 ```{r main figure 3 forest plot}
 my_outcomes=c('Global methylation', 'Pediatric clock', 'AHRR: cg05575921', 'Sustained smoking polymethylation score (newborns, cell-type controlled)')
 
-outcome_labels=c('Global methylation', 'Pediatric clock', 'AHRR: cg05575921',  'Polymethylation score \n (newborn, mean centered)')
+outcome_labels=c('Percent global  \n DNA methylation  (percent)', 'Pediatric epigenetic \n clock (years)', 'Percent DNA methylation of \n cg05575921 in AHRR (percent)',  'Polymethylation score for prenatal maternal \n smoke exposure (standard deviations)')
 
 all_models=rbind(local_models, global_models%>%mutate(ancestry='Unstratified'))
 
@@ -522,10 +522,10 @@ forest_plot=all_models%>%
   theme_classic()+
   theme(text = element_text(size=16))+theme(legend.position = 'bottom')+
   scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')+
-  scale_y_discrete('', limits=c('European ancestry', 'Hispanic ancestry', 'African ancestry', 'Unstratified'), labels=c('European ancestry', 'Hispanic ancestry', 'African ancestry', 'Unstratified'))+scale_color_manual('', values=c('black', 'darkgrey'))
+  scale_y_discrete('', limits=c('European ancestry', 'Hispanic ancestry', 'African ancestry', 'Unstratified'), labels=c('European genetic ancestry', 'Hispanic genetic ancestry', 'African genetic ancestry', 'Unstratified'))+scale_color_manual('', values=c('black', 'darkgrey'))
 
 
-ggexport(forest_plot, filename=file.path(outdir, paste0('Figure', main_fig, '.pdf')), width=15)
+ggexport(forest_plot, filename=file.path(outdir, paste0('Figure', main_fig, '.pdf')), width=19)
 main_fig=main_fig+1
 ```
 
@@ -553,7 +553,7 @@ forest_plot_compareModels=all_models%>%
     theme_classic()+
     theme(text = element_text(size=16))+theme(legend.position = 'bottom')+
     scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')+
-    scale_y_discrete('', limits=c('European ancestry', 'Hispanic ancestry', 'African ancestry', 'Unstratified'), labels=c('European ancestry', 'Hispanic ancestry', 'African ancestry', 'Unstratified'))+scale_color_manual('', values=c('black', 'darkgrey'))
+    scale_y_discrete('', limits=c('European ancestry', 'Hispanic ancestry', 'African ancestry', 'Unstratified'), labels=c('European genetic ancestry', 'Hispanic genetic ancestry', 'African genetic ancestry', 'Unstratified'))+scale_color_manual('', values=c('black', 'darkgrey'))
 
 ggexport(forest_plot_compareModels, filename=file.path(outdir, paste0('SupplementalFigure', sup_fig, '.pdf')), width=15, height=15)
 sup_fig=sup_fig+1
@@ -614,7 +614,7 @@ dna_prepost
 ```{r surrogate variables heatmap}
 #bring the heatmap function
 covar=c('Sample_Plate', 'Slide', 'Array', 'cm1bsex', 'smkPreg_binary', 'childteen', 'ancestry')
-modeldata$Sample_Plate=set_label(modeldata$Sample_Plate, 'Batch')
+modeldata$Sample_Plate=set_label(modeldata$Sample_Plate, 'Sample Plate')
 modeldata$cm1bsex=set_label(modeldata$cm1bsex, 'Child gender')
 modeldata$PostnatalMaternalSmokingAny=set_label(modeldata$PostnatalMaternalSmokingAny, 'Postnatal maternal smoking (age 1 & 5)')
 modeldata$SmkAtVisitPastmonth=set_label(modeldata$SmkAtVisitPastmonth, 'Postnatal maternal smoking (month prior to DNA methylation sample')
@@ -827,7 +827,7 @@ blank_data <- cpg_all %>%dplyr::select(Gene, CpG, estimate, std.error)%>%group_b
 
 blank_data2 <- cpg_all %>%dplyr::select(Gene, CpG, estimate, std.error)%>%group_by(Gene)%>%mutate(min=min(estimate))%>%dplyr::select(-estimate, -std.error)%>%unique()%>%mutate(estimate=min*-1, conf.high=estimate, conf.low=estimate)%>%dplyr::select(-min)%>%arrange(Gene)%>%mutate(source='Fragile Families: Age_9')
 
-plot_aprioriCpG<-ggplot(cpg_all, aes(x=estimate, xmin=conf.low, xmax=conf.high, color=source, y=CpG))+geom_point(position=position_dodge(width=1))+geom_errorbarh(height=0.1, position=position_dodge(width=1))+scale_x_continuous()+geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+facet_wrap(.~Gene, scales='free', ncol=2)+theme_classic()+theme(legend.position = 'bottom')+guides(color=guide_legend(nrow=4,byrow=TRUE))+geom_blank(data = blank_data, aes(x = estimate))+scale_color_discrete('', labels=c('Fragile families saliva: age 15', 'Fragile families saliva: age 9', 'Fragile families: mixed effect model', 'Joubert et al. 2016 newborn cord blood', 'Joubert et al. 2016 peripheral blood older children', 'Wicklund et al. peripheral blood >16 years'))+scale_x_continuous('Estimate (95% CI)')
+plot_aprioriCpG<-ggplot(cpg_all, aes(x=estimate, xmin=conf.low, xmax=conf.high, color=source, y=CpG))+geom_point(position=position_dodge(width=1))+geom_errorbarh(height=0.1, position=position_dodge(width=1))+scale_x_continuous()+geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+facet_wrap(.~Gene, scales='free', ncol=2)+theme_classic()+theme(legend.position = 'bottom')+guides(color=guide_legend(nrow=4,byrow=TRUE))+geom_blank(data = blank_data, aes(x = estimate))+scale_color_discrete('', labels=c('Fragile families saliva: age 15', 'Fragile families saliva: age 9', 'Joubert et al. 2016 newborn cord blood', 'Joubert et al. 2016 peripheral blood older children', 'Wicklund et al. peripheral blood >16 years'))+scale_x_continuous('Estimate (95% CI)')
 
 ggexport(plot_aprioriCpG, filename=file.path(outdir, paste0('SupplementalFigure', sup_fig, '.pdf')), width=9)
 sup_fig=sup_fig+1
@@ -847,6 +847,7 @@ fig4a= global_roc%>%
     dplyr::select(predictors, covariates, methylation, childteen, test, modeltype)%>%
     unnest(test) %>% 
     filter(str_detect(methylation, 'SSnewbornCT|cg0557|global') | modeltype=='Base model')%>%
+  mutate(modeltype=gsub("Sustained smoking polymethylation score \\(newborns, cell-type controlled\\)", "Polymethylation score for prenatal maternal smoke exposure", modeltype))%>%
     ggplot(aes(x=spec, y=sens, color=modeltype))+geom_line()+
     facet_wrap(childteen~., nrow=1, labeller=labeller(childteen=age_labels))+
     theme_classic()+
