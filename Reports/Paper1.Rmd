@@ -56,17 +56,27 @@ library(ggrepel)
 
 as_supp=T
 stand_alone=T
+load_data=T
+run_scripts=F
 ```
 
-```{r temp read n data}
+```{r temp read n data, eval=load_data}
 basedir=here::here()
 outdir=file.path(gsub('Code', 'Output', basedir), 'Figures')
 datadir=gsub('Code', 'Data', basedir)
+scriptdir=file.path(basedir, 'Scripts')
 load(paste0(datadir, '/CreatedData/allPhenoData.Rdata'))
 load(paste0(datadir, '/CreatedData/allmethyl.Rdata'))
 load(paste0(datadir, '/CreatedData/completeCaseSVA.Rdata'))
 load(paste0(datadir, '/CreatedData/methylation_summarymodels.Rdata'))
 modeldata=modeldata %>% mutate(childteen=factor(childteen, levels=c('Age 9', 'Age 15')))%>%droplevels()%>%copy_labels(modeldata)
+```
+
+```{r sources scripts instead of loading, eval=run_scripts}
+source(file.path(scriptdir, '01_clean_phenotype_data.R'))
+source(file.path(scriptdir, '02_make_methyl_summary.R'))
+#assuming 03_sva_variables.R has been run and exists separately as this would take a day to run. 
+source(file.path(scriptdir, '04_summary_methyl_models.R'))
 ```
 
 ```{r plotting variables}
