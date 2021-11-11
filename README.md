@@ -17,6 +17,8 @@ Specifically:
 4. source Scripts/04_summary_methyl_models.R
 5. knit Papers/PolymethylationScores/05_results.Rmd
 
+alternatively, I've added a chunk that will source scripts 01, 02, and 04 and an option to do this instead of loading data from these scripts (change load_data=T to load_data=F and run_scripts=F to run_scripts=T at top chunk of Paper1.Rmd). This still assumes that SVA output already exists. 
+
 ##############################################################################################################################################################################
 
 # Detailed description of code, inputs and outputs
