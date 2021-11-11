@@ -126,13 +126,20 @@ This script takes in the complete case data and runs various multivariable model
 #### outputs -- 
 
 1. modeldata completeCaseSVA.Rdata - complete case data with surrogate variables merged in 
-2. methylation_summarymodels.Rdata - r date object with several dataframes of tidied model output 
+2. methylation_summarymodels.Rdata - r data object with several dataframes of tidied model output 
+
     a. 'long_global_roc', reversed models (i.e. prenatal maternal smoking as outcoem NOT main predictor) w/ ROC (not stratified by visit or ancestry)
+    
     b. 'local_roc', - reversed models (i.e. prenatal maternal smoking as outcome NOT main predictor) w/ ROC curves (stratified by ancestry AND visit)
+    
     c. 'global_roc', - reversed models (i.e. prenatal maternal smoking as outcome NOT main predictor) w/ ROC curves (stratified by visit NOT stratified by ancestry)
+    
     d. 'longitudinal_local_models', - linear mixed effect models (stratified by ancestry)
+    
     e. 'longitudinal_global_models', - linear mixed effect models (not stratified by ancestry)
+    
     f. 'local_models', - cross-sectional models run in age 9 and age 15 visits separately (stratified by ancestry)
+    
     g. 'global_models' - cross-sectional models run in age 9 and age 15 visits separately (but not stratified by ancestry)
 
 #########Stop at 04 for polymethylation scores paper
