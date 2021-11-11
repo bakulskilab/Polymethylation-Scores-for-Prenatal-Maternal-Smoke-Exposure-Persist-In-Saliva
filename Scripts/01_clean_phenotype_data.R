@@ -9,11 +9,12 @@ library(purrr)
 library(tidyverse)
 library(dplyr)
 library(sjlabelled)
+library(here)
 
 #directory based coding
-datadir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/"
-outputdir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Output/"
-codedir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Code/"
+datadir<-gsub('Code', 'Data/', here::here())
+outputdir<-gsub('Code', 'Output/', here::here())
+codedir<-paste0(here::here(), '/')
 
 #read in data 
 pheno<-readRDS(paste0(datadir, "OGData/fullpheno.rds"))

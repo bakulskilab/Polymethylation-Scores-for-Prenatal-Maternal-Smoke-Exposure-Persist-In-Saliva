@@ -8,7 +8,7 @@ library(stringr)
 library(sva)
 
 #directory based programming
-data.dir="/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/"
+data.dir=gsub('Code', 'Data/', here::here())
 output.dir=paste0(data.dir, 'CreatedData/')
 
 #load in betaqc matrix

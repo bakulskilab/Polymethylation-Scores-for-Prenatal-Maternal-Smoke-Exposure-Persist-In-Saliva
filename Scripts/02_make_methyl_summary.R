@@ -1,7 +1,9 @@
+library(here)
 #directory based coding
-datadir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/"
-codedir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Code/"
-clock_coefs="/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/OGData/clock_coefs/"
+datadir<-gsub('Code', 'Data/', here::here())
+codedir<-paste0(here::here(), '/')
+clock_coefs=file.path(paste0(datadir, 'OGData'), 'clock_coefs')
+
 
 ####################################################################library
 library(dplyr)
@@ -89,9 +91,6 @@ save(polyscores, file = file.path(datadir, 'CreatedData', 'polymethylationscores
 polyscores_wide<-lapply(seq_along(polyscores), function(i) polyscores[[i]] %>% setNames(c(paste0(colnames(polyscores[[i]])[1:4], '_', names(polyscores)[i]), 'MethID')))%>%purrr::reduce(left_join, by='MethID')
 
 #################################################epigenetic clocks
-###################THIS NEEDS TO BE CHANGED -- clocks weren't calculated on johns betaqc but on jonahs, 
-#have different probe filter/sample filter sets
-#I've been working with Johns betaqc but using jonahs clocks. 
 if(nrow(betaqc)==423668){
   clocks<-read.csv(file=paste0(datadir, "OGData/ffcw_n1776_8clocks.csv"), header = T)
   colnames(clocks)[1]<-"MethID"
@@ -164,9 +163,8 @@ if(nrow(betaqc)!=423668){
 
 #################################################checks
 summary(methyldata)
-#note the three missing clock ids when left joining to clocks. Also see above. needs to make a decision here about what to do 
 
-#load in complete case analysis
+#load in complete case data set
 load(paste0(datadir, '/CreatedData/completeCasepheno.Rdata'))
 completecase=left_join(completecase, methyldata%>%mutate(idnum=as.character(idnum)))%>%
   mutate(childteen=case_when(childteen=='C'~'Age 9',childteen=='T'~'Age 15'))

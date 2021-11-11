@@ -23,10 +23,12 @@ library(pROC)
 library(lmerTest)
 library(stringr)
 library(sva)
+library(here)
 #############
 ##################################Directories & data
-datadir="/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/CreatedData"
-outputdir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Output"
+datadir=gsub('Code', 'Data/CreatedData', here::here())
+outputdir<-gsub('Code', 'Output', here::here())
+
 #read data 
 load(paste0(datadir, '/completeCasemethyl.Rdata'))
 modeldata=completecase%>%droplevels()%>%copy_labels(completecase)
