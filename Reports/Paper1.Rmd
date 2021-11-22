@@ -385,7 +385,7 @@ if(age_wide_methyl%>%filter(Methyl_factor=='globalmethylation')%>%filter(!is.na(
 
 
 visit_cor=age_wide_methyl%>%
-  ggplot(aes(x=`Age 9`, y=`Age 15`))+geom_point()+stat_cor()+geom_smooth(method=lm)+theme_classic()+
+  ggplot(aes(x=`Age 9`, y=`Age 15`))+geom_point(size=1)+stat_cor(label.sep=', ', size=2.5, label.y.npc=0.95)+geom_smooth(method=lm)+theme_classic()+
   scale_x_continuous('Age 9 score')+scale_y_continuous('Age 15 score')+
   facet_wrap(~Methyl_factor, scales='free', labeller = labeller(Methyl_factor=all_methyl_labels), ncol=3)
 
