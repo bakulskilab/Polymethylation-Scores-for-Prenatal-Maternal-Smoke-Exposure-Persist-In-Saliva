@@ -72,7 +72,7 @@ load(paste0(datadir, '/CreatedData/methylation_summarymodels.Rdata'))
 modeldata=modeldata %>% mutate(childteen=factor(childteen, levels=c('Age 9', 'Age 15')))%>%droplevels()%>%copy_labels(modeldata)
 ```
 
-```{r sources scripts instead of loading, eval=run_scripts}
+```{r sources scripts instead of loading, eval=F}
 source(file.path(scriptdir, '01_clean_phenotype_data.R'))
 source(file.path(scriptdir, '02_make_methyl_summary.R'))
 #assuming 03_sva_variables.R has been run and exists separately as this would take a day to run. 
@@ -607,8 +607,9 @@ dna_prepost=modeldata%>%
                   position = position_dodge(width = 0.75))+
   stat_compare_means(comparisons=my_comparisons)+
     facet_grid(Methyl_factor~childteen, scales='free',labeller = labeller(Methyl_factor=all_methyl_labels))+
-    scale_x_discrete(labels=function(x) str_wrap(x, width = 10))+
-    theme(legend.position = 'right')+
+    scale_x_discrete(labels=function(x) str_wrap(x, width = 20))+
+    theme(legend.position = 'none')+
+  theme(axis.text.x = element_text(angle=30, hjust=1))+
   guides(color=guide_legend(nrow=4,byrow=TRUE))
 
 ggexport(dna_prepost, filename=file.path(outdir, paste0('SupplementalFigure', sup_fig, '.pdf')), width=10, height=10)
@@ -630,7 +631,7 @@ modeldata$PostnatalMaternalSmokingAny=set_label(modeldata$PostnatalMaternalSmoki
 modeldata$SmkAtVisitPastmonth=set_label(modeldata$SmkAtVisitPastmonth, 'Postnatal maternal smoking (month prior to DNA methylation sample')
 
 bring.the.heatmap.sv <- function(pd,covar,folder){
-  
+  library('gtools')
   nsv <- length(grep('sv',names(pd)))
   
   #generate correlation matrix between SVs and variables
@@ -789,7 +790,7 @@ regression_table_ancestry
  ggplot(aes(x=estimate, xmin=conf.low, xmax=conf.high, color=factor(age, rev(levels(age))), y=outcome))+
     geom_point(position = position_dodge(width = 1))+
     geom_errorbarh(height=0.1, position = position_dodge(width = 1))+
-    facet_wrap(predictors~., scales='free_x')+
+    facet_wrap(predictors~., scales='free_x', labeller=labeller(predictors=label_wrap_gen(20)))+
     geom_vline(xintercept=0, color='red', linetype="dashed", alpha=0.5)+
     theme_classic()+
   scale_color_discrete(name='')+scale_x_continuous("Estimate (95% CI)")+scale_y_discrete('')
@@ -858,10 +859,11 @@ fig4a= global_roc%>%
     unnest(test) %>% 
     filter(str_detect(methylation, 'SSnewbornCT|cg0557|global') | modeltype=='Base model')%>%
   mutate(modeltype=gsub("Sustained smoking polymethylation score \\(newborns, cell-type controlled\\)", "Polymethylation score for prenatal maternal smoke exposure", modeltype))%>%
+  mutate(modeltype=factor(modeltype, levels=c('AHRR: cg05575921', 'Base model+AHRR: cg05575921', 'Global methylation', 'Base model+Global methylation',  'Polymethylation score for prenatal maternal smoke exposure', 'Base model+Polymethylation score for prenatal maternal smoke exposure')))%>%
     ggplot(aes(x=spec, y=sens, color=modeltype))+geom_line()+
     facet_wrap(childteen~., nrow=1, labeller=labeller(childteen=age_labels))+
     theme_classic()+
-    scale_color_manual('', values=c('red', 'darkred', 'darkblue', 'darkgreen', 'blue', 'green'), 
+    scale_color_manual('', values=c('red', 'darkred', 'green', 'darkgreen', 'steelblue1', 'royalblue3'), 
                        function(x) str_wrap(x, width = 30))+
     theme(legend.position = 'right')+guides(color=guide_legend(nrow=4, byrow=TRUE))+
     geom_abline(intercept=1, slope=-1, color='black')+
