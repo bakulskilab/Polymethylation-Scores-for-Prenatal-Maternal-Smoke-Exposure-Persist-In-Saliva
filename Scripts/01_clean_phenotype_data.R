@@ -68,11 +68,42 @@ pdqc_all = pdqc_all %>% left_join(airpollution_study %>%
                                     dplyr::select(idnum, MethID, childteen, sex_new))%>%
    mutate(sex_flag=ifelse(sex!=sex_new, 'recode_sex', 'correct_sex'))
 sex_recodes=pdqc_all %>% filter(sex_flag=='recode_sex')%>%pull(idnum)
+
+#############################mislabeled samples data###############################
+#incorporate changes to Fragile Families QC from Jonah on 11/22/2020
+#Additional samples identified as problematic, only incorporate those with cut=='pass';
+#except the 9 sex recodes from above
+#additionally, 3 passing samples were mislabled and have to be relabeled
+cut_data=read.csv(file.path(datadir, 'OGData', '02-thirdpass.csv'))
+mislabel=cut_data %>%
+  mutate(idnum=as.character(idnum), 
+         new_id=idnum, 
+         old_id=case_when(str_detect(changenote, 'idnum')~gsub('idnumchange_from_', '', changenote), 
+                          !str_detect(changenote, 'idnum')~idnum))%>%
+  select(MethID, old_id, new_id, changenote, cut)
+
+only_mislabels=mislabel%>%filter(str_detect(changenote, 'idnum'))%>%select(MethID, old_id, new_id, cut, changenote)
+
+cut_data = cut_data %>%
+  mutate(cut=ifelse(changenote=='intractable_siblingpair', 'cut', cut))%>%
+  mutate(idnum=as.character(idnum))%>%
+  select(idnum, MethID, cut, changenote)
+
+#replace ids for the incorrect samples 
+pdqc_all=pdqc_all%>%
+  left_join(mislabel)%>%
+  mutate(idnum=ifelse(idnum!=new_id, new_id, idnum))%>%
+  left_join(cut_data)%>%
+  mutate(childteen=ifelse(cut=='mother', 'M', childteen), #add new mom problems
+         cut=ifelse(sex_flag=='recode_sex', 'pass', cut)) #relabel sex flagged recodes as pass  
+  
+
 #check
 #with(pdqc_all, table(sex_new, cm1bsex))
 #filter samples w/ >10 probe fail or sex !=predicted sex or sex outlier or mother sample 
 pdqc<-pdqc_all %>% 
-  filter(probe_fail_10==0 & sex_new==predicted_sex & pdqc_all$predicted_sex_outlier==FALSE & childteen!='M')%>%
+filter(probe_fail_10==FALSE & sex_new==predicted_sex & pdqc_all$predicted_sex_outlier==FALSE & childteen!='M')%>%
+  filter(cut=='pass')%>% #filter out 
   #add a new id for identifying technical replicates
   mutate(newID=paste(idnum, childteen, sep='_'))
 
@@ -88,6 +119,9 @@ pdqc_clean<-pdqc %>% filter(!(MethID %in% reps_remove))
 batchData<-read.csv(file.path(datadir, 'Methylation_450K_array_batch_information.csv'))
 pdqc_clean <- pdqc_clean %>% left_join(batchData)
 
+#pdqc=pdqc %>% mutate(sex_mismatch=ifelse(predicted_sex!=sex_new, 'Mismatch', 'match'))
+#table(pdqc$sex_flag, pdqc$cut, pdqc$sex_mismatch)
+
 ############################create new variables###################################
 
 #create following variables in FF_labeled:
@@ -97,7 +131,7 @@ pdqc_clean <- pdqc_clean %>% left_join(batchData)
 #PostnatalMaternal smoking any: if mom smoke at either 1 or 5 - yes, if missing at either - missing, if no at both - no
 #Postnatal maternal smoking does: if mom>1p/d at either 1 or 5 , if mom <1p/d at either 1 or 5, if no smoking at both, if missing + no smoking --> missing
 FF_labeled=FF_labeled %>% 
-  mutate(Methyldata=ifelse(id %in% pdqc_clean$id, 'Analysis subset', 'Not in analysis subset'), 
+  mutate(Methyldata=ifelse(id %in% pdqc_clean$idnum, 'Analysis subset', 'Not in analysis subset'), 
          smkPreg_binary=case_when(m1g4 %in% c("1 2+pk/d","2 1<pk<2","3 <1pk/d" ) ~ 'Yes', 
                                   m1g4 == '4 None'~'No'))%>%
   mutate(across(c('m1g2', 'm1g3'), 
@@ -121,7 +155,7 @@ FF_labeled=FF_labeled %>%
 #ancestry
 #read in local and global pc data
 id_list=list.files(path=paste0(datadir, "OGData/pcs"), pattern='*idnums*', full.names=TRUE)
-id_list%>%map_dfr(read.table, .id='ancestry')
+ancestry_ids=id_list%>%map_dfr(read.table, .id='ancestry')
 
 
 pc_files=list.files(path=paste0(datadir, "OGData/pcs"), pattern='FFCWDNA_.*.csv', full.names=TRUE)
@@ -155,7 +189,7 @@ myFF=FF_labeled%>%filter(Methyldata=='Analysis subset')%>%
 
 #check sex recodes
 #myFF%>% filter(sex_flag=='recode_sex')%>% xtabs(~cm1bsex+sex_new, data=.)
-#######################make visit specific variables###################################
+########################make visit specific variables###################################
 #child age
 #mom/pgc smoking amount past month
 myFF<-myFF %>% 

@@ -155,6 +155,8 @@ n_QCloss<-paste0("Methylation data QC: ",
                            "  with discordant sex samples dropped, \n ", pdqc_all),
                  N_M_count("predicted_sex_outlier==T & sex_new==predicted_sex & probe_fail_10==F & childteen!='M'", 
                            ' with abnormal sex chromosome intensity dropped & \n ', pdqc_all),
+                 N_M_count("cut %in% c('contaminated', 'relative') & predicted_sex_outlier==F & sex_new==predicted_sex & probe_fail_10==F & childteen!='M'", 
+          ' with contamination/mislabels & \n ', pdqc_all),
                  length(reps_remove), " duplicate samples dropped")
 
 n_methylFF<-paste0("Cohort with quality controlled 450K data \n","n=", myFF %>% dplyr::select(id) %>% unique() %>% nrow(), " individuals with m=", myFF%>%nrow(), " samples")

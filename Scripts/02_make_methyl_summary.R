@@ -96,7 +96,7 @@ if(nrow(betaqc)==423668){
   colnames(clocks)[1]<-"MethID"
   grim_pk=read.csv(file=file.path(datadir, 'OGData', 'dnampackyrs_fromgrimoutput.csv'), header=T)
   colnames(grim_pk)[1]<-'MethID'
-  clocks<-left_join(clocks, grim_pk)
+  clocks<-left_join(clocks, grim_pk)%>%dplyr::select(-idnum) #get rid of idnum to avoid bad merging given relabeling of mislabels
   }
 #the below code will run if the # CpGs in your chosen CpG matrix isn't 423668 (see note at top re: Jonah email) as the clocks
 #from ffcw_n1776_8clocks.csv were run using the 423668 matrix. if you switch to some other beta matrix, this code will recreate 
@@ -119,7 +119,7 @@ names(pedc) <- ped[, ID]
 pd[, pediatric := agep(betaqc, coeff = pedc)]
 #pace of aging 
 pd[, c("poam38", "poam45") := PoAmProjector(betaqc)]
-clocks=pd
+clocks=pd%>%dplyr::select(-idnum)
 }
 ################################################join methyl data together 
 methyldata=left_join(cell_types, globalmethdf)%>%
@@ -140,7 +140,7 @@ methyl_labels_myclocks=c('Methylation data ID', 'Epithelial cell proportion', 'F
                          'AHHR: cg05575921', 'MYO1G: cg04180046', 'CYP1A1: cg05549655', 'GFI1: cg14179389', "MYO1G: cg22132788", 
                          pms_labels, gsub('no transform', 'z-score standardized', pms_labels), gsub('no transform', 'mean-centered', pms_labels), 
                          #paste0(pms_labels, '/n (coefficients) & z-score standardized (score)'), gsub('no transform', '/n z-score standardized (coefficients) & z-score standardized (score)', pms_labels), gsub('no transform', '/n mean-centered (coefficients) & z-score standardized (score)', pms_labels),
-                         'ID', 'Visit',
+                          'Visit',
                          'Horvath clock', 'SkinBlood clock', 'Pediatric clock', 'PoAm clock 38', 'PoAm clock 45')
 
 methyl_labels_jonahclocks=c('Methylation data ID', 'Epithelial cell proportion', 'Fibroblast cel proportion', 'Immune cell proportion',
@@ -149,7 +149,7 @@ methyl_labels_jonahclocks=c('Methylation data ID', 'Epithelial cell proportion',
                             'AHHR: cg05575921', 'MYO1G: cg04180046', 'CYP1A1: cg05549655', 'GFI1: cg14179389', "MYO1G: cg22132788", 
                             pms_labels, gsub('no transform', 'z-score standardized', pms_labels), gsub('no transform', 'mean-centered', pms_labels), 
                             #paste0(pms_labels, '/n (coefficients) & z-score standardized (score)'), gsub('no transform', '/n z-score standardized (coefficients) & z-score standardized (score)', pms_labels), gsub('no transform', '/n mean-centered (coefficients) & z-score standardized (score)', pms_labels),
-                            'ID', 'Visit',
+                            'Visit',
                             'Horvath clock', 'SkinBlood clock', 'Hannum clock', 'Pediatric clock', 'Levine clock', 'PoAm clock 38', 'PoAm clock 45', 'GRIM clock', 'GRIM pack/yrs component')
 
 if(nrow(betaqc)==423668){
@@ -166,7 +166,7 @@ summary(methyldata)
 
 #load in complete case data set
 load(paste0(datadir, '/CreatedData/completeCasepheno.Rdata'))
-completecase=left_join(completecase, methyldata%>%mutate(idnum=as.character(idnum)))%>%
+completecase=left_join(completecase, methyldata)%>%
   mutate(childteen=case_when(childteen=='C'~'Age 9',childteen=='T'~'Age 15'))
 ncolumns=ncol(completecase)
 
