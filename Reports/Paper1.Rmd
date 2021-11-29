@@ -305,7 +305,7 @@ graph1
 ```{r supplemental table exclusions}
 myFF$MethylData2<-ifelse(myFF$MethID %in% modeldata$MethID, 'Final analysis group', 'Not in final analysis group')
 set_label(myFF$MethylData2)<-'Exclusions based on missing data'
-myFF=left_join(myFF, methyldata%>%mutate(idnum=as.character(idnum)))
+myFF=left_join(myFF, methyldata)%>%mutate(idnum=as.character(id))
 myFF=myFF%>%mutate(across(c(PostnatalMaternalSmokingAny, SmkAtVisitPastmonth), ~ifelse(.x=='Missing', 
                                                        NA, .x)))%>%
   mutate(ancestry=ifelse(ancestry=='Missing PC data', NA, ancestry))%>%copy_labels(myFF)

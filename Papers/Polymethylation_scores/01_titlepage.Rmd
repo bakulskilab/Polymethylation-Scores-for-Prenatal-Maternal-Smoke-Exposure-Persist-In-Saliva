@@ -10,7 +10,7 @@ always_allow_html: true
 
 **Title:** Polymethylation Scores for Prenatal Maternal Smoke Exposure Persist Until Age 15 and Are Detected in Saliva
 
-**Authors:** Freida A. Blostein$^1$, Jonah Fisher$^2$,  John Dou$^1$, Lisa Schenper$^3$, Erin Ware$^2$ Daniel A. Notterman$^3$, Colter Mitchell$^2$, Kelly M. Bakulski$^1$`
+**Authors:** Freida A. Blostein$^1$, Jonah Fisher$^2$,  John Dou$^1$, Lisa Schenper$^3$, Erin Ware$^2$ Daniel A. Notterman$^{3*}$, Colter Mitchell$^{2*}$, Kelly M. Bakulski$^{1*+}$`
 
 **Affiliations:**
 
@@ -20,3 +20,6 @@ $^2$Institute for Social Research, University of Michigan, Ann Arbor, Michigan, 
 
 $^3$Department of Molecular Biology, Princeton University, Princeton, New Jersey, United States of America 
 
+*Co-senior authors
+
+$^+$Corresponding author
