@@ -14,15 +14,15 @@ Many of the variables used in this analysis are publicly available in the Fragil
 
 ### Competing interests
 
-The authors have no competing interests to declare. check here 
+The authors have no competing interests to declare.
 
 ### Funding
 
-This research was made possible through several grants (add). FB was supported by the National Institutes of Health National Institute of Dental and Craniofacial Research (F31DE029992). 
+This research was made possible through several grants (Fragile Families Core Data Collection: R01 HD036916, R25 AG053227, genetic data processing R01 HD36916, R01 HD073352, and R01 HD076592). FB was supported by the National Institutes of Health National Institute of Dental and Craniofacial Research (F31 DE029992). EB was supported by (R01 AG055406, R01 AG067592, R01 MD011716). 
 
 ### Authors' contributions
 
-FB performed the analysis with contributions from JD, JF, and EW. FB and KB wrote the paper with all authors contributing to revisions. DN, CM, KM, EW and FB all contributed to the design and conception of the study. 
+FB performed the analysis with contributions from JD, JF, and EW. FB and KB wrote the paper with all authors contributing to revisions. CM, DN and LS contributed to the design and processing of the DNA methylation data subcohort. DN, CM, KM, EW, and FB all contributed to the design and conception of the analytic plan.  All authors reviewed and revised the manuscript.
 
 ### Acknowledgements
 
