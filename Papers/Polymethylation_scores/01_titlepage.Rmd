@@ -1,9 +1,10 @@
 ---
 output:
-  html_document: default
+  pdf_document: default
   word_document: default
+  html_document: default
 bibliography: Methylation_SmokingBib.bib
-always_allow_html: true
+always_allow_html: yes
 ---
 
 # Title Page

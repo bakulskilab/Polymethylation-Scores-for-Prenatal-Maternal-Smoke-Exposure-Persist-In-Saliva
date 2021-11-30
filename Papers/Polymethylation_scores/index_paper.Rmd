@@ -1,14 +1,15 @@
 ---
 title: "PAPER DRAFT"
-author: "------------"
+author: '------------'
 date: "`r Sys.Date()`"
 output:
   word_document: default
   html_document:
     df_print: paged
+  pdf_document: default
 bibliography: Methylation_SmokingBib.bib
 csl: springer-vancouver.csl
-always_allow_html: true
+always_allow_html: yes
 ---
 
 ```{r, echo=F, include=F, warning=F, message=F}
