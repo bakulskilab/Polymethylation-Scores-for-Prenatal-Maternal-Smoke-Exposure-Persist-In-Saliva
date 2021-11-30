@@ -191,16 +191,19 @@ childdata= maternaldata %>% filter(ancestry!='Missing PC data' & !is.na(cm1bsex)
 n_withchilddata=paste0('m=', childdata %>% nrow(), ' samples & n=', childdata %>% dplyr::select(idnum)%>%unique()%>%nrow(), ' individuals with child covariate data')
 
 n_Child<-paste0('n=', childdata %>%filter(childteen=='C')  %>% nrow(), " individuals with a 9 year visit")
-n_ChildSmkexcluded<-paste0("Exclude children who smoke: \n",'n=', childdata%>%filter(childteen=='C' & k5f1l=='2 no')%>% nrow(), 
+n_ChildSmkexcluded<-paste0("Exclude children who smoke: \n",'n=', childdata%>%filter((k5f1l=="2 no" | (is.na(k5f1l) & k6d40=='2 No')) & childteen=='C')%>% nrow(), 
                            " individuals with a 9 year visit")
-n_ChildSmkexclusions<-paste0('n=', childdata %>% filter((k5f1l=="1 yes" | is.na(k5f1l)) & childteen=='C') %>% nrow(), 
+n_ChildSmkexclusions<-paste0('n=', childdata %>% filter((k5f1l=="1 yes" | (is.na(k5f1l) & (k6d40!='2 No' | is.na(k6d40)))) & childteen=='C') %>% nrow(), 
                              " individuals smoking \n or missing child smoking data \n at 9 year visit")
+
 n_Teen<-paste0('n=', childdata %>%filter(childteen=='T')   %>% nrow(), " individuals with a 15 year visit")
-n_TeenSmkexcluded<-paste0("Exclude children who smoke: \n",'n=', childdata %>%filter(childteen=='T' & k6d40=="2 No") %>% nrow(), 
+n_TeenSmkexcluded<-paste0("Exclude children who smoke: \n",'n=', childdata %>%filter(childteen=='T' & k6d40=="2 No" & (k5f1l!='1 yes' | is.na(k5f1l))) %>% nrow(), 
                           " individuals with a 15 year visit")
 n_TeenSmkexclusions<-paste0('n=', childdata %>% filter((k6d40=="1 Yes" | is.na(k6d40) | k5f1l=='1 yes') & childteen=='T') %>% nrow,
                             " individuals smoking \n or missing focal child smoking data \n at 15 year visit") 
 
+
+test=childdata %>%filter((childteen=='T' & k6d40=="2 No") | (childteen=='C' & k5f1l=='2 no'))
 
 if(childdata %>% filter(((k5f1l=="2 no" | (is.na(k5f1l) & k6d40=='2 No')) & childteen=='C') | (childteen=='T' & k6d40=="2 No" & (k5f1l=='2 no' |  is.na(k5f1l))))%>%nrow()!=nrow(modeldata)){stop('filter N and completecase data set N do not match')}
 
@@ -293,6 +296,18 @@ graph1 %>%
   read_xml() %>%
   write_xml(file.path(outdir, paste0("Figure", main_fig, ".svg")))
 
+save_png <- function(plot, path){
+  DiagrammeRsvg::export_svg(plot) %>%
+    charToRaw() %>%
+    rsvg::rsvg() %>%
+    png::writePNG(path)
+}
+save_png(graph1, file.path(outdir, paste0('Figure', main_fig, ".png")))
+
+ DiagrammeRsvg::export_svg(graph1) %>%
+    charToRaw() %>%
+    rsvg::rsvg_ps(file.path(outdir, paste0('Figure', main_fig, ".ps")))
+
 main_fig=main_fig+1            
 ```
 
@@ -311,7 +326,7 @@ myFF=myFF%>%mutate(across(c(PostnatalMaternalSmokingAny, SmkAtVisitPastmonth), ~
   mutate(ancestry=ifelse(ancestry=='Missing PC data', NA, ancestry))%>%copy_labels(myFF)
 
 exclusion_tbl=myFF %>% mutate(childteen=case_when(childteen=='C'~'Age 9', childteen=='T'~'Age 15'))%>%
-    dplyr::select(smkPreg_binary, childteen, MethylData2, SSnewbornCT_center, cg05575921, pediatric, globalmethylation, Leukocytes_saliva, Epithelial.cells_saliva, ancestry, cm1bsex,  m1g2_YesNoPreg, m1g3_YesNoPreg, cm1inpov, PostnatalMaternalSmokingAny,SmkAtVisitPastmonth )%>%
+    dplyr::select(smkPreg_binary, childteen, MethylData2, SSnewbornCT_center, cg05575921, pediatric, globalmethylation, Leukocytes_saliva, Epithelial.cells_saliva, ancestry, cm1bsex, city_binary,  m1g2_YesNoPreg, m1g3_YesNoPreg, cm1inpov, PostnatalMaternalSmokingAny,SmkAtVisitPastmonth )%>%
   mutate(smkPreg_binary=factor(smkPreg_binary, levels=c('No', 'Yes'), labels=c('Not exposed', 'Smoke exposed')), 
          cm1bsex=factor(cm1bsex, levels=c('1 Boy', '2 Girl'), labels=c('Boy', 'Girl')))%>%
   mutate(cm1bsex=set_label(cm1bsex, 'Child gender'), smkPreg_binary=set_label(smkPreg_binary, 'Prenatal maternal smoking'),
@@ -341,7 +356,7 @@ model_twovisit=modeldata_wide[complete.cases(modeldata_wide), ]
 modeldata_people=modeldata%>%
   dplyr::select(any_of(c('idnum', 'ancestry', 'cm1bsex', 'ancestry', 
                          'm1g2_YesNoPreg', 'm1g3_YesNoPreg', 'cm1inpov',
-                         'smkPreg_binary', 'PostnatalMaternalSmokingAny')))%>%unique()
+                         'smkPreg_binary', 'PostnatalMaternalSmokingAny', 'city_binary')))%>%unique()
 ```
 
 
@@ -442,6 +457,7 @@ fig2=age_long_methyl%>%
 
 
 ggexport(fig2, filename=file.path(outdir, paste0('Figure', main_fig, '.pdf')))
+ggexport(fig2, filename=file.path(outdir, paste0('Figure', main_fig, '.eps')))
 main_fig=main_fig+1
 
 ```
@@ -454,7 +470,7 @@ fig2
 ```{r bivariate table}
 
 smoking_tbl=modeldata %>% 
-  dplyr::select(smkPreg_binary, childteen, SSnewbornCT_center, cg05575921, pediatric, globalmethylation, Leukocytes_saliva, Epithelial.cells_saliva, ancestry, cm1bsex,  m1g2_YesNoPreg, m1g3_YesNoPreg, cm1inpov, PostnatalMaternalSmokingAny,SmkAtVisitPastmonth )%>%
+  dplyr::select(smkPreg_binary, childteen, SSnewbornCT_center, cg05575921, pediatric, globalmethylation, Leukocytes_saliva, Epithelial.cells_saliva, ancestry, cm1bsex,  city_binary, m1g2_YesNoPreg, m1g3_YesNoPreg, cm1inpov, PostnatalMaternalSmokingAny,SmkAtVisitPastmonth )%>%
   mutate(smkPreg_binary=factor(smkPreg_binary, levels=c('No', 'Yes'), labels=c('Not exposed', 'Smoke exposed')), 
          cm1bsex=factor(cm1bsex, levels=c('1 Boy', '2 Girl'), labels=c('Boy', 'Girl')))%>%
     mutate(cm1bsex=set_label(cm1bsex, 'Child gender'), smkPreg_binary=set_label(smkPreg_binary, 'Prenatal maternal smoking'),
@@ -538,6 +554,7 @@ forest_plot=all_models%>%
 
 
 ggexport(forest_plot, filename=file.path(outdir, paste0('Figure', main_fig, '.pdf')), width=19)
+ggexport(forest_plot, filename=file.path(outdir, paste0('Figure', main_fig, '.eps')), width=19)
 main_fig=main_fig+1
 ```
 
@@ -567,7 +584,7 @@ forest_plot_compareModels=all_models%>%
     scale_x_continuous('Coefficient for prenatal maternal smoking + 95% CI')+
     scale_y_discrete('', limits=c('European ancestry', 'Hispanic ancestry', 'African ancestry', 'Unstratified'), labels=c('European genetic ancestry', 'Hispanic genetic ancestry', 'African genetic ancestry', 'Unstratified'))+scale_color_manual('', values=c('black', 'darkgrey'))
 
-ggexport(forest_plot_compareModels, filename=file.path(outdir, paste0('SupplementalFigure', sup_fig, '.pdf')), width=15, height=15)
+ggexport(forest_plot_compareModels, filename=file.path(outdir, paste0('SupplementalFigure', sup_fig, '.pdf')), width=18, height=15)
 sup_fig=sup_fig+1
 ```
 
@@ -893,6 +910,7 @@ fig4b=global_roc%>%
 auc_fig=cowplot::plot_grid(fig4a, fig4b, labels=c('A', 'B'), nrow=1, rel_widths=c(0.63, 0.37), align='h', axis='tb')
 
 ggexport(auc_fig, filename=file.path(outdir, paste0('Figure', main_fig, '.pdf')), width=9)
+ggexport(auc_fig, filename=file.path(outdir, paste0('Figure', main_fig, '.eps')), width=9)
 main_fig=main_fig+1
 ```
 
