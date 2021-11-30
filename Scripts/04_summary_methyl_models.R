@@ -72,7 +72,7 @@ names(outcome_labels)=y_vector
 
 
 #model variables (excepting PCs, add in individually for global & ancestry specific models)
-base_model_vars<-"~smkPreg_binary+cm1bsex+cm1inpov+Leukocytes_saliva+Sample_Plate+ChildAgeComposite"
+base_model_vars<-"~smkPreg_binary+cm1bsex+cm1inpov+Leukocytes_saliva+Sample_Plate+ChildAgeComposite+city_binary"
 prenatal_model_vars<-paste0(base_model_vars, "+m1g2_YesNoPreg+m1g3_YesNoPreg")
 secondhand_model_vars<-paste0(prenatal_model_vars, '+PostnatalMaternalSmokingAny+SmkAtVisitPastmonth')
 interaction_model_vars<-paste0(secondhand_model_vars, '+ChildAgeComposite:smkPreg_binary')
@@ -195,7 +195,7 @@ longitudinal_local_models=my_clean_argnames(longitudinal_local_models, local_pre
 modeldata=modeldata%>%mutate(smkPreg_binaryN=case_when(smkPreg_binary=='Yes'~1, smkPreg_binary=='No'~0))
 
 #global predictors, cross sectional
-roc_predictors=c('', gsub('~smkPreg_binary', '', paste0(base_model_vars, global_pcs)))
+roc_predictors=c('', gsub('+m1city', '', gsub('~smkPreg_binary', '', paste0(base_model_vars, global_pcs))))
 roc_outcomes=c('', y_vector)
 args=list('childteen'=age_vector, 'methylation'=roc_outcomes, 'covariates'=roc_predictors)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))%>%
   filter(predictors!='')

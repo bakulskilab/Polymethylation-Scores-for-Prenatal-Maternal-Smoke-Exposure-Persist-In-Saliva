@@ -35,12 +35,13 @@ pheno=set_labels(pheno, labels=attributes(pheno)$label.table)
 FF_factors=FFmeta%>%
   filter(type%in% c('Binary', 'Ordered Categorical', 'Unordered Categorical'))%>%
   pull(old_name)
+FF_factors=c(FF_factors, 'm1city')
 #recode binary, categorical variables so they have label names as values (nicer for table and plotting)
 pheno=pheno %>% dplyr::mutate(across(any_of(FF_factors), ~sjlabelled::as_label(., drop.levels=TRUE)))
 
 #dplyr::select variables
 idvars<-c("id", "ff_id")
-demovars<-c("cm1age", "cm1bsex", "cm1ethrace", "cm1edu", "cm1hhinc", "cm1inpov", "m1h3", "m1h3a", "m1h3b", "m1i4", "m1i4a", "m1i4b", "cf1age", "cf1ethrace", "f1h3", "f1h3a", "f1h3b", "ch5agem","ch6yagem", "c6yagey", "cm5b_age", "cm5b_ageyrs", "cp6yagem", "cp6yagey", "hv5_agem", "hv6_yagem", "hv6_yagey")
+demovars<-c("m1city", "cm1age", "cm1bsex", "cm1ethrace", "cm1edu", "cm1hhinc", "cm1inpov", "m1h3", "m1h3a", "m1h3b", "m1i4", "m1i4a", "m1i4b", "cf1age", "cf1ethrace", "f1h3", "f1h3a", "f1h3b", "ch5agem","ch6yagem", "c6yagey", "cm5b_age", "cm5b_ageyrs", "cp6yagem", "cp6yagey", "hv5_agem", "hv6_yagem", "hv6_yagey")
 smokingvars<-c("m1g4", "f1g4", "f2j5", "f2j5a", "f2j7", "f2j7a", "f3j31", "f3j32", "f4j18", "f4j19", "f5g17", "f5g18", "k5f1k", "k5f1l", "k6d40", "k6d41", "k6d41", "k6d42", "k6d43", "k6d45", "k6d46", "k6d47", "m2j5", "m2j5a", "m2j7", "m2j7a", "m4j18", "m4j19", "m5g17", "m5g18", "n5f17", "n5f18", "p3a22", "p3a23", "p3a23a", "p3a23b", "p3a24", "p4a22", "p4a23", "p5h15", "p5h15b", "p5q3cr", "p6h74", "p6h75", "p6h76", "p6h77", "p6h78")
 prenataldrugusevar<-c("m1g2", "m1g3", "m1g5", "m1g6")
 FF_labeled=pheno %>%dplyr::select(any_of(c(idvars, demovars, smokingvars, prenataldrugusevar)))
@@ -208,9 +209,11 @@ myFF<-myFF %>%
     childteen=='T' & p6h77=='-6 Skip'~ 'No smoking'))
 #throws NA warning because of as.numeric in these statements - sow rite a check to make sure there aren't NAs here 
 if(myFF%>%filter(is.na(SmkAtVisitPastmonth))%>%nrow()!=0){stop('NA in SmkAtVisitPastmonth')}
+myFF=myFF %>% mutate(city_binary=case_when(m1city %in% c('4 Detroit', '15 Chicago', '17 Toledo')~'Detroit, Chicago or Toledo', 
+                                           !(m1city %in% c('4 Detroit', '15 Chicago', '17 Toledo'))~'Not Detroit, Chicago or Toledo'))
 
 ################################################################################add labels
-set_label(myFF)=c(get_label(myFF)[1:69], 'Has 450K Illumina chip data', 'Maternal prenatal smoking', 
+set_label(myFF)=c(get_label(myFF)[1:70], 'Has 450K Illumina chip data', 'Maternal prenatal smoking', 
                   'Maternal prenatal alcohol use', 'Maternal prenatal any drug use', 
                   'Any postnatal maternal smoking when child age 1 or 5', 'Postnatal maternal smoking dose when child age 1 or 5', 
                   'Ancestry categorization from child principal components of genetic data', 
@@ -218,7 +221,8 @@ set_label(myFF)=c(get_label(myFF)[1:69], 'Has 450K Illumina chip data', 'Materna
                   paste0('Within all samples principal component', 1:50), 
                   'Methylation data ID', 'Visit', 'ID', 'Batch', 'Slide', 'Array',
                   'sex_fromjonah', 'sex recode flag',
-                  'Child age at visit', 'Maternal/primary care giver smoking in month prior to visit (pks/day)')
+                  'Child age at visit', 'Maternal/primary care giver smoking in month prior to visit (pks/day)', 
+                  'Oversampled cities')
 
 #######################complete case dataset###################################
 
