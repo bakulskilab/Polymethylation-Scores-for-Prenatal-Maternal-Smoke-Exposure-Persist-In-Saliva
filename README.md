@@ -1,5 +1,4 @@
-# Polymethylation Scores for Prenatal Maternal Smoke Exposure Persist Until Age
-15 and Are Detected in Saliva
+# Polymethylation Scores for Prenatal Maternal Smoke Exposure Persist Until Age 15 and Are Detected in Saliva
 
 This is the code repository for the medrxiv preprint https://www.medrxiv.org/content/10.1101/2021.11.30.21267020v2
 
