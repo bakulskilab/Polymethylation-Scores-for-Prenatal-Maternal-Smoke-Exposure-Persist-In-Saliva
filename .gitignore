@@ -11,3 +11,8 @@ Reports/Poster/IGES_poster_vertical_files
 Reports/Poster/IGES_poster_files/
 *.log
 *.out
+*/local/
+Papers/Polymethylation_scores/05_results_cache/
+Papers/Polymethylation_scores/05_results_files/
+Papers/Polymethylation_scores/index_paper_cache/
+Papers/Polymethylation_scores/index_paper_files/
