@@ -209,7 +209,9 @@ global_roc=modeldata%>%
   mutate(model=pmap(list(data, 'smkPreg_binaryN~', predictors), model_reversed), 
          tidied=map(model, tidy, conf.int=T), 
          augmented=map(model, augment, type.predict = "response"), 
-         roc=map(augmented, ~roc(.x$smkPreg_binaryN, .x$.fitted)), 
+         roc=map(augmented, ~roc(.x$smkPreg_binaryN, .x$.fitted)),
+         ci_auc_delong=map(roc, ~ci.auc(.x, conf.level=0.95, method='delong')), 
+         #ci_auc_boot=map(roc, ~ci.auc(.x, conf.level=0.95, method='bootstrap')),
          test=map(roc, ~data.frame('sens'=.x$sensitivities, spec=.x$specificities)))%>%
   left_join(methyl_names)%>%
   mutate(modeltype=case_when(covariates==''~name_methyl, 
@@ -226,6 +228,8 @@ local_roc=modeldata%>%group_by(childteen, ancestry)%>%nest()%>%left_join(args)%>
          tidied=map(model, tidy, conf.int=T), 
          augmented=map(model, augment, type.predict = "response"), 
          roc=map(augmented, ~roc(.x$smkPreg_binaryN, .x$.fitted)), 
+         ci_auc_delong=map(roc, ~ci.auc(.x, conf.level=0.95, method='delong')), 
+         #ci_auc_boot=map(roc, ~ci.auc(.x, conf.level=0.95, method='bootstrap')),
          test=map(roc, ~data.frame('sens'=.x$sensitivities, spec=.x$specificities)))%>%
   left_join(methyl_names)%>%
   mutate(modeltype=case_when(covariates==''~name_methyl, 
@@ -252,6 +256,8 @@ long_global_roc=args %>%
          tidied=map(model, tidy, conf.int=T), 
          augmented=map(model, augment, type.predict = "response"), 
          roc=map(augmented, ~roc(.x$smkPreg_binaryN, .x$.fitted)), 
+         ci_auc_delong=map(roc, ~ci.auc(.x, conf.level=0.95, method='delong')), 
+         #ci_auc_boot=map(roc, ~ci.auc(.x, conf.level=0.95, method='bootstrap')),
          test=map(roc, ~data.frame('sens'=.x$sensitivities, spec=.x$specificities)))
 
 save(list=c('long_global_roc', 'local_roc', 'global_roc', 'longitudinal_local_models', 'longitudinal_global_models', 'local_models', 'global_models'), file=paste0(datadir, '/methylation_summarymodels.Rdata'))

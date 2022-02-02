@@ -921,11 +921,22 @@ auc_fig
 # Supplemental Table `r sup_tab`: Area under the curve for models shown in Main Figure 4 for classifying prenatal maternal smoke exposure, with *P* value when comparing to base model only or to model using polymethylation score + base model. Base model: Child sex, maternal income to poverty ratio, immune cell proportion, plate, 1st two principal components from PCA on child genetic data, child age.  
 
 ```{r supplemental table auc}
-roc_table=global_roc %>% dplyr::select(childteen, methylation, modeltype, roc, auc)
-roc_base=roc_table %>% filter(modeltype=='Base model+No methylation')%>%mutate(roc_basemodel=roc)%>%dplyr::select(childteen, roc_basemodel)
-roc_ss=roc_table %>% filter(modeltype=='Base model+Sustained smoking polymethylation score (newborns, cell-type controlled)')%>%mutate(roc_pms=roc)%>%dplyr::select(childteen, roc_pms)
+#CI.delong is the confidence interval for each auc: if we sampled 100 times, 95 of the samples would have a auc between those two numbers
+roc_table=global_roc %>% 
+  dplyr::select(childteen, methylation, modeltype, roc, auc, ci_auc_delong, ci_auc_boot)%>%
+  mutate(ci.delong=map_chr(ci_auc_delong, ~paste(round(.x[1], 2), round(.x[3], 2), sep=', ')))
 
+roc_base=roc_table %>% 
+  filter(modeltype=='Base model+No methylation')%>%
+  rename_with(~str_c(., '_basemodel'), .cols=c(roc, auc, ci.delong))%>%
+  dplyr::select(childteen, contains('_basemodel'))
 
+roc_ss=roc_table %>% 
+  filter(modeltype=='Base model+Sustained smoking polymethylation score (newborns, cell-type controlled)')%>%
+  rename_with(~str_c(., '_pms'), .cols=c(roc, auc, ci.delong))%>%
+  dplyr::select(childteen, contains('_pms'))
+
+#confidence_interval_difference_pms|base is the confidence interval for the DIFFERENCE between the two aucs - if we took 100 samples of the difference between the aucs, 95 of them would be between those two numbers: avoids incorrect error propagation, since the squares of errors add, not the errors themselves (see an explanation here: https://towardsdatascience.com/why-overlapping-confidence-intervals-mean-nothing-about-statistical-significance-48360559900a)
 rct1=roc_table%>% 
   filter(methylation %in% c('globalmethylation', 'cg05575921', 'SSnewbornCT_center_scale', ''))%>%
   left_join(roc_base)%>%
@@ -935,7 +946,9 @@ rct1=roc_table%>%
   mutate(auc=round(auc, 2))%>%
   mutate(`P value vs polymethylation score`=map_dbl(roctest_ss, ~round(.x$p.value, 4)))%>%
   mutate(`P value vs base model`=map_dbl(roctest_base, ~round(.x$p.value, 4)))%>%
-  dplyr::select(childteen, modeltype, auc, `P value vs base model`, `P value vs polymethylation score`)
+  mutate(confidence_interval_difference_base=map_chr(roctest_base, ~paste(round(.x$conf.int[1], 2), round(.x$conf.int[2], 2), sep=', ')))%>%
+  mutate(confidence_interval_difference_pms=map_chr(roctest_ss, ~paste(round(.x$conf.int[1], 2), round(.x$conf.int[2], 2), sep=', ')))%>%
+  dplyr::select(childteen, modeltype, auc, `P value vs base model`, `P value vs polymethylation score`, confidence_interval_difference_base, confidence_interval_difference_pms)
 
 sup_tab=sup_tab+1  
 ```
