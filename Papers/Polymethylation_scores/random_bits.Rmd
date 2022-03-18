@@ -1,0 +1,36 @@
+---
+title: "Untitled"
+author: "F blostein"
+date: "3/11/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In bivariate analyses and multivariable models, we focused on the 6074 site polymethylation score for prenatal smoke exposure constructed using the Joubert metaanalysis coefficients from newborn cord blood and the single top CpG site from prior research, cg05575921 in the *AHRR* gene , as hypothesized biomarkers [@Joubert:2016ue], and used global methylation and the pediatric clock as negative controls.
+
+For our main analysis we used coefficients for 6074 sites from a regression of sustained smoking exposure and DNA methylation in newborn cord blood with cell-type control. As sensitivity analyses, we used coefficients for the same sites from regressions of: sustained smoking exposure and DNA methylation in newborn cord blood without cell-type control, sustained smoking exposure and DNA methylation in peripheral blood from older children without cell-type control, and any smoking exposure and DNA methylation in newborn cord blood without cell-type control [@Joubert:2016ue]. 
+
+Two of these scores, reported by Richmond et al., used regression coefficients from the Joubert et al. meta-analysis as described above. However these two scores were limited to the DNA methylation sites with $P$ values<1.07613e-07, respectively 568 sites in the newborn cord blood regression and 19 sites in the older children peripheral blood regressions. A third score used 28 sites from a LASSO regression of prenatal maternal smoking and DNA methylation in newborn cordblood. A fourth score used 204 sites from an elastic net regression of prenatal maternal smoking and DNA methylation in peripheral blood from 17 year olds
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

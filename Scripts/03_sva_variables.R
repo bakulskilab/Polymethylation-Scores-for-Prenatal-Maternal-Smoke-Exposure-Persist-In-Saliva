@@ -12,8 +12,8 @@ data.dir=gsub('Code', 'Data/', here::here())
 output.dir=paste0(data.dir, 'CreatedData/')
 
 #load in betaqc matrix
-#as of october 4 switched to beta file with  423668 probes (see Jonah email search Check in on sex filtration/clocks Fragile Families)
-betaqc<-readRDS(file=paste0(data.dir, 'OGData/', "betaqc.rds"))
+#as of February 2022 switched to betaqc matrix with 437588 
+betaqc<-readRDS(file=paste0(data.dir, 'OGData/Feb2022DataFreeze/', "beta_analytic_freeze1.rds"))
 
 load(paste0(data.dir, '/CreatedData/completeCasepheno.Rdata'))
 pheno<-completecase # dataset with the most exclusion i.e. squaring dataset off for all models (excluding kids who smoke in figure)

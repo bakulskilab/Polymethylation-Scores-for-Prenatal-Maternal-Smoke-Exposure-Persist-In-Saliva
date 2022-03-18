@@ -56,72 +56,21 @@ FF_labeled=FF_labeled%>%mutate(across(everything(), ~na_codes(., my_na_codes)))%
 
 ############################pdqc data######################################
 
-#As of October 4 added in the 9 sex incorrect at birth samples (see Jonah email search Check in on sex filtration/clocks Fragile Families)
-#removed 3 sex outlier samples to bring sample size in line w/ air pollution paper 1745 observations
-pdqc_all<-readRDS(paste0(datadir, 'OGData/', "pd_qc.rds"))
-airpollution_study<-read.csv(paste0(datadir, 'OGData/', 'isee_pollutionpegs_newvars_5.6.2021.csv'))
-IDsNotInAir=pdqc_all$MethID[!(pdqc_all$MethID %in% airpollution_study$MethID)]
-IDsNotInAir= pdqc_all %>%filter(MethID %in% IDsNotInAir)
-childIDNotInAir=IDsNotInAir%>%filter(childteen!='M')
-#figure out samples w/ incorrect sex at birth variable 
-pdqc_all = pdqc_all %>% left_join(airpollution_study %>% 
-                                    mutate(idnum=as.character(idnum), sex_new=sex)%>% 
-                                    dplyr::select(idnum, MethID, childteen, sex_new))%>%
-   mutate(sex_flag=ifelse(sex!=sex_new, 'recode_sex', 'correct_sex'))
+#As of February 11 switch to February 2022 Data Freeze, which includes some fixes to sex mismatches due to incorrect
+#coding at birth interview; only clean samples which are not technical replicates are included in this file according to Jonah 
+pdqc_all<-read.csv(paste0(datadir, 'OGData/Feb2022DataFreeze/', "pd_analytic_freeze1.csv"))
+#Flag samples w/ incorrect sex at birth variable 
+pdqc_all = pdqc_all %>% 
+          left_join(FF_labeled %>% 
+                      mutate(sex_old=stringr::word(cm1bsex), idnum=as.integer(id))%>% 
+                      dplyr::select(idnum, sex_old))%>%
+          mutate(sex_flag=ifelse(cm1bsex!=sex_old, 'recode_sex', 'correct_sex'), 
+                 new_sex=cm1bsex)
 sex_recodes=pdqc_all %>% filter(sex_flag=='recode_sex')%>%pull(idnum)
-
-#############################mislabeled samples data###############################
-#incorporate changes to Fragile Families QC from Jonah on 11/22/2020
-#Additional samples identified as problematic, only incorporate those with cut=='pass';
-#except the 9 sex recodes from above
-#additionally, 3 passing samples were mislabled and have to be relabeled
-cut_data=read.csv(file.path(datadir, 'OGData', '02-thirdpass.csv'))
-mislabel=cut_data %>%
-  mutate(idnum=as.character(idnum), 
-         new_id=idnum, 
-         old_id=case_when(str_detect(changenote, 'idnum')~gsub('idnumchange_from_', '', changenote), 
-                          !str_detect(changenote, 'idnum')~idnum))%>%
-  select(MethID, old_id, new_id, changenote, cut)
-
-only_mislabels=mislabel%>%filter(str_detect(changenote, 'idnum'))%>%select(MethID, old_id, new_id, cut, changenote)
-
-cut_data = cut_data %>%
-  mutate(cut=ifelse(changenote=='intractable_siblingpair', 'cut', cut))%>%
-  mutate(idnum=as.character(idnum))%>%
-  select(idnum, MethID, cut, changenote)
-
-#replace ids for the incorrect samples 
-pdqc_all=pdqc_all%>%
-  left_join(mislabel)%>%
-  mutate(idnum=ifelse(idnum!=new_id, new_id, idnum))%>%
-  left_join(cut_data)%>%
-  mutate(childteen=ifelse(cut=='mother', 'M', childteen), #add new mom problems
-         cut=ifelse(sex_flag=='recode_sex', 'pass', cut)) #relabel sex flagged recodes as pass  
-  
-
-#check
-#with(pdqc_all, table(sex_new, cm1bsex))
-#filter samples w/ >10 probe fail or sex !=predicted sex or sex outlier or mother sample 
-pdqc<-pdqc_all %>% 
-filter(probe_fail_10==FALSE & sex_new==predicted_sex & pdqc_all$predicted_sex_outlier==FALSE & childteen!='M')%>%
-  filter(cut=='pass')%>% #filter out 
-  #add a new id for identifying technical replicates
-  mutate(newID=paste(idnum, childteen, sep='_'))
-
-#identify among technical replicates the sample with higher pct probe failure
-reps_remove=pdqc%>%group_by(newID)%>%filter(n()>1)%>% #filter to technical replicates
-  filter(probe_fail_pct==max(probe_fail_pct))%>% #filter to high pct probe fail
-  pull(MethID)
-
-#remove replicates with a higher pct probe failure 
-pdqc_clean<-pdqc %>% filter(!(MethID %in% reps_remove))
 
 #add batch, slide and plate data
 batchData<-read.csv(file.path(datadir, 'Methylation_450K_array_batch_information.csv'))
-pdqc_clean <- pdqc_clean %>% left_join(batchData)
-
-#pdqc=pdqc %>% mutate(sex_mismatch=ifelse(predicted_sex!=sex_new, 'Mismatch', 'match'))
-#table(pdqc$sex_flag, pdqc$cut, pdqc$sex_mismatch)
+pdqc_clean <- pdqc_all %>% left_join(batchData)
 
 ############################create new variables###################################
 
@@ -163,6 +112,8 @@ pc_files=list.files(path=paste0(datadir, "OGData/pcs"), pattern='FFCWDNA_.*.csv'
 names(pc_files)=gsub('.csv', '', list.files(path=paste0(datadir, "OGData/pcs"), pattern='FFCWDNA_.*.csv'))
 names(pc_files)=paste0(str_to_title(str_match(names(pc_files), '.*_(.*)_n.*')[,2]), ' ancestry')
 localpc=pc_files%>%map_dfr(read.csv, .id='ancestry')%>%rename_with(~str_c('local_', .), contains('PC'))
+localpc$ancestry=case_when(localpc$ancestry=='Hispanic ancestry'~'Admixed ancestry - Latin heritage', 
+                           TRUE ~ localpc$ancestry)
 allPC<-read.table(paste0(datadir, "OGData/pcs/pcs_n50.eigenvec"), col.names=c("idnum", 'idnum2', paste("global_PC", 1:50, sep='')))
 
 old_pc=list.files(path=paste0(datadir, "OGData/pcs"), pattern='.*[n|c].csv', full.names=TRUE)
@@ -184,12 +135,12 @@ save(MissingPCdata, file = paste0(datadir, "CreatedData/MissingPC.Rdata"))
 #######################filter to analysis subset and join with pdqc###################################
 myFF=FF_labeled%>%filter(Methyldata=='Analysis subset')%>%
   left_join(pdqc_clean%>% 
-              dplyr::select(MethID, childteen, idnum, Sample_Plate, Slide, Array, sex_new, sex_flag)%>%
+              dplyr::select(MethID, childteen, idnum, Sample_Plate, Slide, Array, new_sex, sex_flag)%>%
               mutate(id=as.character(idnum)))%>%
   copy_labels(., FF_labeled)
 
 #check sex recodes
-#myFF%>% filter(sex_flag=='recode_sex')%>% xtabs(~cm1bsex+sex_new, data=.)
+#myFF%>% filter(sex_flag=='recode_sex')%>% xtabs(~cm1bsex+new_sex, data=.)
 ########################make visit specific variables###################################
 #child age
 #mom/pgc smoking amount past month
@@ -219,14 +170,13 @@ set_label(myFF)=c(get_label(myFF)[1:70], 'Has 450K Illumina chip data', 'Materna
                   'Ancestry categorization from child principal components of genetic data', 
                   paste0('Within ancestry strata principal component', 1:20), 
                   paste0('Within all samples principal component', 1:50), 
-                  'Methylation data ID', 'Visit', 'ID', 'Batch', 'Slide', 'Array',
+                  'Methylation data ID', 'Visit', 'ID', 'Plate', 'Slide', 'Array',
                   'sex_fromjonah', 'sex recode flag',
                   'Child age at visit', 'Maternal/primary care giver smoking in month prior to visit (pks/day)', 
                   'Oversampled cities')
 
 #######################complete case dataset###################################
 
-methylCohort<-pdqc_all %>% filter(childteen!='M')
 
 basemodelvar<-c("smkPreg_binary", "ancestry", "cm1bsex", "cm1inpov", "ChildAgeComposite")
 basemodeldata<-myFF %>% filter_at(all_of(basemodelvar), all_vars(!(. %in%c("Missing", "Missing PC data"))& !is.na(.)))

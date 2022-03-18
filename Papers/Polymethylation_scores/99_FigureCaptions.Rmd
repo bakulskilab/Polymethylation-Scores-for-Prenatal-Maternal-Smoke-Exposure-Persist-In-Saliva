@@ -34,9 +34,16 @@ fig2
 forest_plot
 ```
 
-####  **Figure 4 - Polymethylation scores accurately classify prenatal maternal smok exposure at ages 9 and 15 among `r n_total` children in the Fragile Families and Child Wellbeing study** A) Receiver operator curve for select DNA methylation measures for predicting prenatal smoke exposure using no other variables (light colors) or using base model variables (dark colors, other variables included: child sex, maternal income-poverty ratio at birth, immune cell proportion and batch of methylation data processing). B) Receiver operator curve for include polymethylation scores individually at each visit (black & light grey) or jointly (dark grey). 
+####  **Figure 4 - Polymethylation scores accurately classify prenatal maternal smoke exposure at ages 9 and 15 among `r n_total` children in the Fragile Families and Child Wellbeing study** A) Receiver operator curve for select DNA methylation measures for predicting prenatal smoke exposure using no other variables (light colors) or using base model variables (dark colors, other variables included: child sex, maternal income-poverty ratio at birth, immune cell proportion and batch of methylation data processing). B) Receiver operator curve for include polymethylation scores individually at each visit (black & light grey) or jointly (dark grey). 
 
 ```{r, echo=F, eval=print_figs, include=T,  fig.width=12}
 auc_fig
 ```
+
+#### **Figure 5 - Comparison of different polymethylation scores and their accuracy at classifying prenatal smoke exposure among `r n_total` children with saliva samples in the Fragile Families and Child Wellbeing study as opposed to previously reported results in cord and peripheral blood samples
+
+```{r, echo=F, eval=print_figs, include=T,  fig.width=12}
+auc_compare
+```
+
 

@@ -35,8 +35,9 @@ modeldata=completecase%>%droplevels()%>%copy_labels(completecase)
 
 #set as factors 
 modeldata=modeldata %>% mutate(childteen=factor(childteen, levels=c('Age 9', 'Age 15')))
+#reversed levels - very few prenatal smoking + no maternal smoking at age 1 and 5
 modeldata$PostnatalMaternalSmokingAny<-factor(modeldata$PostnatalMaternalSmokingAny, 
-                                              levels=c("No maternal smoking at age 1 and 5", 
+                                              levels=c("No maternal smoking at age 1 and 5",
                                                        "Maternal smoking at age 1 or age 5"))
 modeldata$SmkAtVisitPastmonth<-factor(modeldata$SmkAtVisitPastmonth, 
                                       levels=c("No smoking", 
@@ -46,7 +47,7 @@ modeldata$SmkAtVisitPastmonth<-factor(modeldata$SmkAtVisitPastmonth,
 modeldata$Sample_Plate<-factor(modeldata$Sample_Plate)
 
 #sv data - no variance filter, whole subset
-sv.vNone=readRDS(paste0(datadir, '/svNone.Rds'))
+sv.vNone=readRDS(paste0(datadir, '/svNone.Rds')) # temporarily changed to archived sv well rerunning with new beta matrix 
 is_sv=function(x) str_replace_all(x, " ", "")
 sv.vNone=sv.vNone%>%rename_with(is_sv, contains('sv'))
 modeldata=left_join(modeldata, sv.vNone)%>%copy_labels(modeldata)
@@ -58,15 +59,11 @@ save(modeldata, file=file.path(datadir, file='completeCaseSVA.Rdata'))
 #################################Set variables for modeling
 #outcomes & outcome_labels
 
-y_vector<-c("globalmethylation", "pediatric", "anynewborn_center_scale", 
-            "SSnewbornCT_center_scale", "SSnewborn_center_scale",  "SSolder_center_scale", 
+y_vector<-c("globalmethylation", "PedBE", "anynewborn_center_scale", 
+            "SSnewbornCT_center_scale", "SSnewborn_center_scale",  "SSolder_center_scale", 'reese_center_scale',
+            'richmond19_center_scale', 'richmond568_center_scale',
             "cg05575921", "cg04180046", "cg05549655", "cg14179389","cg22132788")
-outcome_labels=c('Global methylation', 'Pediatric clock',  
-                 'Any smoking polymethylation score (newborns)', 
-                 'Sustained smoking polymethylation score (newborns, cell-type controlled)', 
-                 'Sustained smoking polymethylation score (newborns)',
-                 'Sustained smoking polymethylation score (older children)', 
-                 'AHRR: cg05575921', "MYO1G: cg04180046", "CYP1A1: cg05549655" ,  "GFI1: cg14179389" , "MYO1G: cg22132788")
+outcome_labels=modeldata%>%dplyr::select(any_of(y_vector))%>%get_label()
 
 names(outcome_labels)=y_vector
 
@@ -140,7 +137,7 @@ args=list('childteen'=age_vector, 'outcome'=y_vector, 'predictors'=global_predic
 global_models=modeldata%>%group_by(childteen)%>%nest()%>%left_join(args)%>%
   mutate(model=pmap(list(data, outcome, predictors), model), 
          tidied=map(model, tidy, conf.int=T), 
-         glanced=map(model, glance))
+         glanced=map(model, broom::glance))
 
 #clean argument names for plotting
 global_models=my_clean_argnames(global_models, global_predictors)
@@ -154,7 +151,7 @@ args=list('childteen'=c('Age 9', 'Age 15'), 'outcome'=y_vector, 'predictors'=loc
 local_models=modeldata%>%group_by(childteen, ancestry)%>%nest()%>%left_join(args)%>%
   mutate(model=pmap(list(data, outcome, predictors), model), 
          tidied=map(model, tidy, conf.int=T), 
-         glanced=map(model, glance))
+         glanced=map(model, broom::glance))
 
 #clean argument names for plotting
 local_models=my_clean_argnames(local_models, local_predictors)
@@ -218,21 +215,31 @@ global_roc=modeldata%>%
                              covariates!=''~paste0('Base model+', name_methyl)))%>%
   mutate(auc=map_dbl(roc, ~as.numeric(gsub('Area under the curve', '', .x$auc))))
 
-#local predictors, crosssectional 
+#add roc from elastic net coefficient based score 
+global_roc_en = modeldata %>% group_by(childteen)%>%nest()%>% 
+  mutate(methylation='elastic_net_score', covariates='', predictors='elastic_net_score',
+         model=NA, tidied=NA, augmented=NA, 
+         roc=map(data, ~roc(.x$smkPreg_binaryN, .x$enscore_probs)), 
+         ci_auc_delong=map(roc, ~ci.auc(.x, conf.level=0.95, method='delong')),
+         test=map(roc, ~data.frame('sens'=.x$sensitivities, spec=.x$specificities)), 
+         modeltype='Elastic net score', auc=map_dbl(roc, ~as.numeric(gsub('Area under the curve', '', .x$auc))))
+global_roc=rbind(global_roc, global_roc_en)
+
+#local predictors, cross-sectional 
 roc_predictors=c('', gsub('~smkPreg_binary', '', paste0(base_model_vars, local_pcs)))
 args=list('childteen'=age_vector, 'methylation'=c('', y_vector), 'covariates'=roc_predictors)%>%cross_df()%>%mutate(predictors=paste0(methylation, covariates))%>%filter(predictors!='')
 
 
 local_roc=modeldata%>%group_by(childteen, ancestry)%>%nest()%>%left_join(args)%>%
-  mutate(model=pmap(list(data, 'smkPreg_binaryN~', predictors), model_reversed), 
-         tidied=map(model, tidy, conf.int=T), 
-         augmented=map(model, augment, type.predict = "response"), 
-         roc=map(augmented, ~roc(.x$smkPreg_binaryN, .x$.fitted)), 
-         ci_auc_delong=map(roc, ~ci.auc(.x, conf.level=0.95, method='delong')), 
+  mutate(model=pmap(list(data, 'smkPreg_binaryN~', predictors), model_reversed),
+         tidied=map(model, tidy, conf.int=T),
+         augmented=map(model, augment, type.predict = "response"),
+         roc=map(augmented, ~roc(.x$smkPreg_binaryN, .x$.fitted)),
+         ci_auc_delong=map(roc, ~ci.auc(.x, conf.level=0.95, method='delong')),
          #ci_auc_boot=map(roc, ~ci.auc(.x, conf.level=0.95, method='bootstrap')),
          test=map(roc, ~data.frame('sens'=.x$sensitivities, spec=.x$specificities)))%>%
   left_join(methyl_names)%>%
-  mutate(modeltype=case_when(covariates==''~name_methyl, 
+  mutate(modeltype=case_when(covariates==''~name_methyl,
                              covariates!=''~paste0('Base model+', name_methyl)))%>%
   mutate(auc=map_dbl(roc, ~as.numeric(gsub('Area under the curve', '', .x$auc))))
 

@@ -3,18 +3,39 @@ title: "PAPER DRAFT"
 author: '------------'
 date: "`r Sys.Date()`"
 output:
-  word_document: default
+  word_document: 
+    reference_docx: "../Template.docx"
   html_document:
     df_print: paged
   pdf_document: default
-bibliography: Methylation_SmokingBib.bib
+bibliography: [Methylation_SmokingBib.bib, packages.bib]
 csl: springer-vancouver.csl
 always_allow_html: yes
 ---
 
-```{r, echo=F, include=F, warning=F, message=F}
+```{r, echo=F, include=F, message=F, warning=F}
 library(stringr)
+library(knitr)
+library(tidyverse)
+library(tidyr)
+library(dplyr)
+
+coefCI=function(df, filter_statement, my_term, si){
+  my_df=df%>%
+    filter(eval(parse(text = filter_statement)))%>%
+    unnest(tidied)%>%
+    mutate(val=paste0(round(estimate, si), ' (95%CI: ', 
+                      round(conf.low, si), ', ',
+                      round(conf.high, si), ')'))%>%
+    filter(term==my_term)%>%
+    pull(val)
+  return(my_df)
+}
+```
+
+```{r load data, echo=F, include=F, warning=F, message=F, cache=TRUE, cache.lazy=F}
 results_run=str_detect(here::here(), 'nfs/turbo/bakulski1')
+knitr::knit_child(here::here("Reports", "Paper1.Rmd"))
 ```
 
 ```{r, child = here::here("Papers", "Polymethylation_scores", "01_titlepage.Rmd")}
@@ -29,6 +50,9 @@ results_run=str_detect(here::here(), 'nfs/turbo/bakulski1')
 ```{r child = here::here("Papers", "Polymethylation_scores", "04_background.Rmd")}
 ```
 
+```{r child = here::here("Papers", "Polymethylation_scores", "08_methods.Rmd")}
+```
+
 ```{r child = here::here("Papers", "Polymethylation_scores", "05_results.Rmd"), eval=results_run}
 ```
 
@@ -36,9 +60,6 @@ results_run=str_detect(here::here(), 'nfs/turbo/bakulski1')
 ```
 
 ```{r child = here::here("Papers", "Polymethylation_scores", "07_conclusions.Rmd")}
-```
-
-```{r child = here::here("Papers", "Polymethylation_scores", "08_methods.Rmd")}
 ```
 
 ```{r child = here::here("Papers", "Polymethylation_scores", "98_declarations.Rmd")}

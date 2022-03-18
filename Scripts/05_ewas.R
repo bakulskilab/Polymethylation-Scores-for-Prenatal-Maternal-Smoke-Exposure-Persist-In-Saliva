@@ -9,6 +9,7 @@ library(limma)
 library('variancePartition')
 library('edgeR')
 library('BiocParallel')
+#NOTE FEBRUARY MAKE SURE DROP probes that are cross reactive before doing EWAS (new beta did not remove cross reactive probes) 
 
 datadir="/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data"
 outputdir<-"/nfs/turbo/bakulski1/People/blostein/FF_methylation/Data/CreatedData/EWAS"
