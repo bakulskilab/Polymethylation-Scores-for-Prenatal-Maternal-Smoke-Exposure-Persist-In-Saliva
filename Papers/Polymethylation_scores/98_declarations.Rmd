@@ -10,7 +10,7 @@ Not applicable
 
 ### Availability of data and materials
 
-Many of the variables used in this analysis are publicly available in the Fragile Families dataset. Some of the data used in this analysis, including genetic and epigenetic data, is restricted use but available to researchers upon reasonable application. 
+Many of the variables used in this analysis are publicly available in the Fragile Families and Child Wellbeing dataset at http://opr.princeton.edu/archive/restricted/Default.aspx. The genetic and epigenetic data is restricted use but available to researchers upon standard application. 
 
 ### Competing interests
 
@@ -18,7 +18,7 @@ The authors have no competing interests to declare.
 
 ### Funding
 
-This research was made possible through several grants (Fragile Families Core Data Collection: R01 HD036916, R25 AG053227, genetic data processing R01 HD36916, R01 HD073352, and R01 HD076592). FB was supported by the National Institutes of Health National Institute of Dental and Craniofacial Research (F31 DE029992). EB was supported by (R01 AG055406, R01 AG067592, R01 MD011716). 
+This research was made possible through several grants (Fragile Families Core Data Collection: R01 HD036916, , genetic data processing R01 HD36916, R01 HD073352, R01 MD011716, and R01 HD076592). FB was supported by the National Institutes of Health National Institute of Dental and Craniofacial Research (F31 DE029992) and R25 AG053227. EB was supported by R01 AG055406, R01 AG067592, and R01 MD011716. LS, DN, and JF were supported by R01 HD076592, R01 MD011716. CM was supported by R01 AG07107, R01 MD011716, R01 HD076592.
 
 ### Authors' contributions
 
