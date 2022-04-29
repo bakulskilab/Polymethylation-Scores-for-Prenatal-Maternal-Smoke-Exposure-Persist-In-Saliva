@@ -131,6 +131,8 @@ FF_labeled=FF_labeled %>% left_join(localpc%>%mutate(id=as.character(idnum))%>%d
 
 MissingPCdata<-FF_labeled %>% filter(ancestry=="Missing PC data")%>%dplyr::select(id)
 save(MissingPCdata, file = paste0(datadir, "CreatedData/MissingPC.Rdata"))
+#save FFlabeled
+save(FF_labeled, file = paste0(datadir, "CreatedData/FFlabeled.Rdata"))
 
 #######################filter to analysis subset and join with pdqc###################################
 myFF=FF_labeled%>%filter(Methyldata=='Analysis subset')%>%
