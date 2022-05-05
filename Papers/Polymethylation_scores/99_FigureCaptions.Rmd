@@ -10,9 +10,9 @@ always_allow_html: true
 print_figs=TRUE
 ```
 
-#### Table 1: Bivariate associations between prenatal maternal smoking (no/yes) and selected DNA methylation summary measures and important covariates among a diverse sample of `r n_total` children in the Fragile Families and Child Wellbeing study
+#### **Table 1: Bivariate associations between prenatal maternal smoking (no/yes) and selected DNA methylation summary measures and important covariates among a diverse sample of `r n_total` children in the Fragile Families and Child Wellbeing study**
 
-```{r,  eval=print_figs, include=T}
+```{r, echo=F, eval=print_figs, include=T, include=T}
 smoking_tbl
 ```
 
@@ -40,9 +40,9 @@ forest_plot
 auc_fig
 ```
 
-#### **Figure 5 - Comparison of different polymethylation scores and their accuracy at classifying prenatal smoke exposure among `r n_total` children with saliva samples in the Fragile Families and Child Wellbeing study as opposed to previously reported results in cord and peripheral blood samples
+#### **Figure 5 - Comparison of different polymethylation scores and their accuracy at classifying prenatal smoke exposure among `r n_total` children with saliva samples in the Fragile Families and Child Wellbeing study as opposed to previously reported results in cord and peripheral blood samples**
 
-```{r, echo=F, eval=print_figs, include=T,  fig.width=12}
+```{r, echo=F, eval=print_figs, warning=F, include=T,  fig.width=12}
 auc_compare
 ```
 
