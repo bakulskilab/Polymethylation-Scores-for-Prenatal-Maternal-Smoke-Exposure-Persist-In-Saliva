@@ -1,13 +1,18 @@
 # Polymethylation scores for prenatal maternal smoke exposure persist until age 15 and are detected in saliva in the Fragile Families and Child Wellbeing cohort
 
+## Citation Information
+Blostein, F. A., Fisher, J., Dou, J., Schneper, L., Ware, E. B., Notterman, D. A., Mitchell, C., & Bakulski, K. M. (2022). Polymethylation scores for prenatal maternal smoke exposure persist until age 15 and are detected in saliva in the Fragile Families and Child Wellbeing cohort. Epigenetics, 17(13), 2223–2240. https://doi.org/10.1080/15592294.2022.2112815. PMID: 35980258
+
+This Github repository contains the data management and analytic scripts to produce the following manuscript: [Polymethylation scores for prenatal maternal smoke exposure persist until age 15 and are detected in saliva in the Fragile Families and Child Wellbeing cohort](https://pubmed.ncbi.nlm.nih.gov/35980258/)
+
+
 ## Abstract
 
 Prenatal maternal smoking is associated with low birthweight, neurological disorders, and asthma in exposed children. DNA methylation signatures can function as biomarkers of prenatal smoke exposure. However, the robustness of DNA methylation signatures across child ages, genetic ancestry groups, or tissues is not clear. Using coefficients from a meta-analysis of prenatal smoke exposure and DNA methylation in newborn cord blood, we created polymethylation scores of saliva DNA methylation from children at ages 9 and 15 in the Fragile Families and Child Wellbeing study. In the full sample at age 9 (n = 753), prenatal smoke exposure was associated with a 0.51 (95%CI: 0.35, 0.66) standard deviation higher polymethylation score. The direction and magnitude of the association was consistent in European and African genetic ancestry samples. In the full sample at age 15 (n = 747), prenatal smoke exposure was associated with a 0.48 (95%CI: 0.32, 0.63) standard deviation higher polymethylation score, and the association was attenuated among the European and Admixed-Latin genetic ancestry samples. The polymethylation score classified prenatal smoke exposure accurately (AUC age 9 = 0.77, age 15 = 0.76). Including the polymethylation score increased the AUC of base model covariates by 5 (95% CI: (2.1, 7.2)) percentage points, while including a single candidate site in the AHRR gene did not (P-value = 0.19). Polymethylation scores for prenatal smoking were portable across genetic ancestries and more accurate than an individual DNA methylation site. Polymethylation scores from saliva samples could serve as robust and practical biomarkers of prenatal smoke exposure.
 
-## Citation Information
-Blostein, F. A., Fisher, J., Dou, J., Schneper, L., Ware, E. B., Notterman, D. A., Mitchell, C., & Bakulski, K. M. (2022). Polymethylation scores for prenatal maternal smoke exposure persist until age 15 and are detected in saliva in the Fragile Families and Child Wellbeing cohort. Epigenetics, 17(13), 2223–2240. https://doi.org/10.1080/15592294.2022.2112815. PMID: 35980258
 
-This is the code repository for the medrxiv preprint https://www.medrxiv.org/content/10.1101/2021.11.30.21267020v2
+## Funding
+This research was made possible through several grants (Fragile Families Core Data Collection: R01 HD036916, genetic data processing R01 HD36916, R01 HD073352, R01 MD011716, and R01 HD076592). FB was supported by F31 DE029992 and R25 AG053227. KB was supported by R01 AG074887 and R01 MD013299. EBW was supported by R01 AG055406, R01 AG067592, and R01 MD011716. LS, DN, and JF were supported by R01 HD076592, R01 MD011716. CM was supported by R01 AG07107, R01 MD011716, R01 HD07659; Eunice Kennedy Shriver National Institute of Child Health and Human Development [R01 HD07659, R01 HD036916, R01 HD36916, R01 HD073352]; National Institute of Dental and Craniofacial Research [F31 DE029992]; National Institute on Aging [R01 AG055406, R01 AG067592, R01 AG07107, R25 AG053227, R01 AG074887]; National Institute on Minority Health and Health DisparitiesNational Institute on Minority Health and Health Disparities [R01 MD013299, R01 MD011716].
 
 ## Script files
 
